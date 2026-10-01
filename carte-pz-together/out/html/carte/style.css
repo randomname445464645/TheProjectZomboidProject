@@ -206,18 +206,26 @@ body.replie #carte { inset: 0; }
 
 /* ----------------------------------------------------------------- hud --- */
 
-#hud {
+#basGauche {
   position: absolute;
   left: 10px; bottom: 10px;
   z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  max-height: calc(100% - 20px);
+  pointer-events: none;
+}
+#hud, #pulseCarte {
   background: rgba(0, 0, 0, .72);
   border: 1px solid var(--trait);
   border-radius: 5px;
   padding: 6px 10px;
   font-variant-numeric: tabular-nums;
-  pointer-events: none;
-  line-height: 1.6;
 }
+#hud { pointer-events: none; line-height: 1.6; }
+#hud[hidden], #pulseCarte[hidden] { display: none; }
 #hud .coord { font-size: 14px; }
 #hud b { color: var(--accent); }
 #hud .detail { color: var(--faible); font-size: 11px; }
@@ -861,3 +869,32 @@ body.replie #suivre { right: 8px; }
   color: var(--faible);
   white-space: nowrap;
 }
+
+/* ---- Fiche du personnage (PZ Pulse) ----------------------------------- */
+#pulseCarte {
+  pointer-events: auto;
+  cursor: pointer;
+  min-width: 190px;
+  max-width: 300px;
+  overflow-y: auto;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pl { display: flex; align-items: center; gap: 8px; }
+.pl-nom { color: var(--faible); flex: 0 0 auto; min-width: 70px; }
+.pl b { color: var(--texte); font-weight: 600; margin-left: auto; white-space: nowrap; }
+.pl-barre {
+  flex: 1 1 60px;
+  height: 5px;
+  background: #2a2e36;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.pl-barre i { display: block; height: 100%; background: #5fbf72; }
+.pl-barre i.moyen { background: var(--accent); }
+.pl-barre i.grave { background: #e8735f; }
+.pl-etat { color: var(--faible); }
+.etiquette-bloc { color: var(--faible); font-size: 11px; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+.pulse-groupe { margin-top: 6px; font-weight: 600; font-size: 12px; }
+.pulse-grille { display: grid; grid-template-columns: 1fr 1fr; gap: 1px 10px; }
+.pulse-grille label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

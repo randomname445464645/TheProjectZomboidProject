@@ -23,6 +23,7 @@ import * as vehicules from './vehicules.js';
 import * as loot from './loot.js';
 import { exporterVue } from './exporter.js';
 import * as menu from './menu.js';
+import * as pulse from './pulse.js';
 import { initConstructions, basculerConstructions, dessinerConstructions,
          disponible as constructionsDisponibles,
          nombreCases as nbConstructions,
@@ -84,6 +85,8 @@ function mesurer() {
 let sourisX = null, sourisY = null;
 
 function majHud() {
+  // Masque par defaut (Carte > Calques) : inutile de le recalculer a chaque image.
+  if ($('hud').hidden) return;
   const info = infoRendu();
   if (!info) return;
   if (sourisX !== null) {
@@ -810,6 +813,7 @@ function initOnglets() {
     // epinglees : sinon elles encombreraient la carte en permanence.
     histo.afficher(nom === 'traces' || $('traceEpingler').checked);
     if (nom === 'traces') ouvrirTraces();
+    pulse.onglet(nom === 'fiche');
   };
   for (const b of boutons) b.addEventListener('click', () => montrer(b.dataset.onglet));
   for (const b of document.querySelectorAll('.sous-onglets button')) {
@@ -1218,6 +1222,69 @@ function initJoueurPanneau() {
   $('suivre').addEventListener('click', () => {
     if (joueur.etat.suivre) joueur.basculerSuivi(false);
     else joueur.basculerSuivi(true, 'moi');
+  });
+}
+
+// --- fiche du personnage (PZ Pulse) ------------------------------------------
+
+function construireCasesPulse() {
+  const hote = $('pulseCases');
+  hote.textContent = '';
+  for (const g of pulse.MESURES) {
+    const titre = document.createElement('div');
+    titre.className = 'pulse-groupe';
+    titre.textContent = g.groupe;
+    hote.appendChild(titre);
+    const grille = document.createElement('div');
+    grille.className = 'pulse-grille';
+    for (const m of g.cles) {
+      const l = document.createElement('label');
+      const c = document.createElement('input');
+      c.type = 'checkbox';
+      c.checked = pulse.etat.coches.has(m.cle);
+      c.addEventListener('change', () => pulse.cocher(m.cle, c.checked));
+      l.appendChild(c);
+      l.append(' ' + m.nom);
+      grille.appendChild(l);
+    }
+    hote.appendChild(grille);
+  }
+}
+
+function majPulseUI() {
+  $('etatPulse').textContent = pulse.resume();
+}
+
+function ouvrirPulse() {
+  if (!pulse.ouvrirFenetre()) {
+    $('etatPulse').textContent = 'fenetre bloquee par le navigateur : autorise les fenetres surgissantes pour la carte';
+  }
+}
+
+function initPulsePanneau() {
+  pulse.initPulse($('pulseCarte'), majPulseUI);
+  construireCasesPulse();
+  $('pulseOuvrir').addEventListener('click', ouvrirPulse);
+  $('pulseCarte').addEventListener('click', ouvrirPulse);
+  $('pulseRien').addEventListener('click', () => {
+    for (const m of pulse.MESURES.flatMap(g => g.cles)) pulse.cocher(m.cle, false);
+    construireCasesPulse();
+  });
+  $('pulseDefaut').addEventListener('click', () => {
+    const defaut = new Set(['sante', 'faim', 'soif', 'fatigue', 'endurance']);
+    for (const m of pulse.MESURES.flatMap(g => g.cles)) pulse.cocher(m.cle, defaut.has(m.cle));
+    construireCasesPulse();
+  });
+
+  // L'encadre technique du bas (coordonnees, zoom) : masque sauf demande.
+  let hud = false;
+  try { hud = localStorage.getItem('pzcarte.hud') === '1'; } catch (e) {}
+  $('calqueHud').checked = hud;
+  $('hud').hidden = !hud;
+  $('calqueHud').addEventListener('change', function () {
+    $('hud').hidden = !this.checked;
+    try { localStorage.setItem('pzcarte.hud', this.checked ? '1' : '0'); } catch (e) {}
+    demanderRendu();
   });
 }
 
@@ -1671,6 +1738,7 @@ function menuCarte(e) {
       demanderRendu();
     } },
     moi && { libelle: 'me suivre', aide: 'touche F', action: () => joueur.basculerSuivi(true, 'moi') },
+    { libelle: 'ouvrir la fiche du personnage', aide: 'PZ Pulse', action: ouvrirPulse },
   ]);
 }
 
@@ -1724,6 +1792,7 @@ async function demarrer() {
   initTracesPanneau();
   initRadioPanneau();
   initVehiculesPanneau();
+  initPulsePanneau();
   allerOnglet = initOnglets();
   // Les deux panneaux ne sont rafraichis qu'a l'ouverture de leur onglet :
   // sans ce premier passage, le compteur de bases reste vide tant qu'on n'y

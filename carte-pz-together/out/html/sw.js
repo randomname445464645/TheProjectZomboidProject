@@ -10,7 +10,7 @@
 // s'ouvrir instantanement et de fonctionner meme si le serveur local n'a pas
 // encore demarre.
 
-const VERSION = 'carte-pz-v9';   // v9 : sous-onglets, menu du clic droit
+const VERSION = 'carte-pz-v10';  // v10 : fiche PZ Pulse
 
 // Chemins de la coquille. Les parametres ?v= des balises sont conserves tels
 // quels : c'est l'URL complete qui sert de cle de cache.
@@ -28,6 +28,7 @@ const COQUILLE = [
   '/carte/loot-table.js',
   '/carte/exporter.js',
   '/carte/menu.js',
+  '/carte/pulse.js',
   '/carte/constructions.js',
   '/carte/bases.js',
   '/carte/itineraire.js',
@@ -73,6 +74,9 @@ self.addEventListener('fetch', e => {
   // remplirait le Cache Storage et, serveur eteint, resservirait une vieille
   // position avec un age qui la ferait passer pour du direct.
   if (url.pathname.startsWith('/api/')) return;
+  // La page de PZ Pulse pese 850 Ko et vient du dossier du mod : hors de la
+  // coquille, et sans interet serveur eteint puisqu'elle n'aurait rien a lire.
+  if (url.pathname.startsWith('/pulse')) return;
 
   // TOUTE la coquille passe par le reseau d'abord, avec repli sur le cache
   // seulement si le serveur ne repond pas.

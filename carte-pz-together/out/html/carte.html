@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#14161a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="pwa/icone-192.png">
-<link rel="stylesheet" href="carte/style.css?v=25">
+<link rel="stylesheet" href="carte/style.css?v=26">
 </head>
 <body>
 
@@ -30,10 +30,15 @@
 <button id="suivre" hidden title="Centrer la carte sur toi et te suivre (touche F). Glisser la carte arrete le suivi.">me suivre</button>
 <div id="consigne" hidden></div>
 
-<div id="hud">
-  <div class="coord">x <b id="hudX">-</b> &nbsp; y <b id="hudY">-</b></div>
-  <div class="detail" id="hudZoom">-</div>
-  <div class="detail" id="hudCompte">-</div>
+<!-- Coin bas gauche : la fiche du personnage (valeurs cochees dans Joueurs >
+     Fiche), puis l'encadre technique (coordonnees, zoom), masque par defaut. -->
+<div id="basGauche">
+  <div id="pulseCarte" hidden title="Clic : ouvrir la fiche complete"></div>
+  <div id="hud" hidden>
+    <div class="coord">x <b id="hudX">-</b> &nbsp; y <b id="hudY">-</b></div>
+    <div class="detail" id="hudZoom">-</div>
+    <div class="detail" id="hudCompte">-</div>
+  </div>
 </div>
 
 <div id="panneau">
@@ -160,6 +165,7 @@
       <button data-sous="direct">En direct</button>
       <button data-sous="vehicules">Vehicules <i class="nb" id="nbVehiculesOnglet"></i></button>
       <button data-sous="traces">Traces</button>
+      <button data-sous="fiche">Fiche</button>
     </nav>
 
     <section class="sous-volet" data-sous-volet="direct" hidden>
@@ -223,6 +229,27 @@
       </div>
       <div id="traceStats"></div>
     </section>
+
+    <section class="sous-volet" data-sous-volet="fiche" hidden>
+      <div class="bloc">
+        <div class="ligne-sync" style="margin-top:0">
+          <button id="pulseOuvrir" class="principal" title="La page du mod PZ Pulse, dans sa propre fenetre, nourrie par l'agent">ouvrir la fiche complete</button>
+        </div>
+        <div class="aide" id="etatPulse"></div>
+      </div>
+      <div class="bloc">
+        <div class="etiquette-bloc">Afficher sur la carte</div>
+        <div id="pulseCases"></div>
+        <div class="ligne-boutons">
+          <button id="pulseRien">rien</button>
+          <button id="pulseDefaut">par defaut</button>
+        </div>
+        <p class="aide">Les valeurs cochees s'affichent en bas a gauche de la
+          carte, tant que le jeu tourne. Elles viennent de l'agent : le mod PZ
+          Pulse n'a pas besoin d'etre sur le serveur, seulement telecharge
+          sur ce PC pour la fiche complete.</p>
+      </div>
+    </section>
   </section>
 
   <!-- CARTE ============================================================ -->
@@ -241,6 +268,9 @@
         <label class="case-calque">
           <input type="checkbox" id="calqueBases" checked> mes bases
           <i class="nb" id="nbBases"></i>
+        </label>
+        <label class="case-calque">
+          <input type="checkbox" id="calqueHud"> encadre coordonnees et zoom
         </label>
         <label class="case-calque" id="labelConstructions" hidden>
           <input type="checkbox" id="calqueConstructions"> mes constructions
@@ -287,6 +317,6 @@
   </section>
 </div>
 
-<script type="module" src="carte/app.js?v=47"></script>
+<script type="module" src="carte/app.js?v=48"></script>
 </body>
 </html>

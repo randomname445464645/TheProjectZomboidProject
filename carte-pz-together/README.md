@@ -72,6 +72,7 @@ out/html/carte.html        page
 out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, vehicules.js, app.js
 out/html/serveur.py        serveur statique, bibliotheque standard seule
 out/html/vehicules.py      vehicules : releve en direct, journal agrege
+out/html/pulse.py          fiche du personnage (PZ Pulse) tiree de pulse.json
 out/html/icones_vehicules.py  rendu des modeles 3D des vehicules (numpy, Pillow, assimp)
 out/html/icons/            10 sprites extraits de UI2.pack
 out/html/markers.json      1860 marqueurs

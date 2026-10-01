@@ -403,3 +403,46 @@ n'a aucune méthode de remontée réseau.
 
 Beaucoup de serveurs imposent une liste blanche de mods. À voir avec
 l'administrateur.
+
+## La fiche du personnage (PZ Pulse)
+
+Un quatrième thread, `pz-export-pulse`, écrit chaque seconde
+`~/Zomboid/pz-export/pulse.json` : la fiche complète du personnage, au format
+du mod Workshop **PZ Pulse** (santé et blessures par partie du corps,
+protection, vêtements, armes en main, température, besoins, humeurs,
+compétences et XP, recettes apprises).
+
+Le mod n'est pas installé sur le serveur, il ne peut donc pas tourner. La
+classe `Pulse` refait ses collecteurs (`PZ_Pulse_Collectors.lua`) en Java,
+avec les mêmes getters, et produit le même objet JSON. Le serveur de la carte
+le présente à la page du mod comme le ferait le mod lui-même :
+
+- `GET /pulse.html` sert la page `index.html` du mod, **lue là où le mod est
+  téléchargé sur ce PC** (`~/Zomboid/mods/PZ_Pulse`, ou le dossier Workshop
+  de Steam). Elle n'est pas copiée dans ce dépôt : c'est le travail de son
+  auteur. Sans le mod, la page explique quoi faire. Chemin forcé possible
+  avec `PZCARTE_PULSE_PAGE`.
+- `/api/pulse/data.txt`, `heartbeat.txt`, `lang.txt` : les fichiers que la
+  page recharge, tirés de `pulse.json`. Comme ils sont chargés par balise
+  `<script>`, ils ne peuvent pas porter l'en-tête `X-Carte` : le serveur
+  vérifie `Sec-Fetch-Site` (ou `Referer`) pour qu'aucun autre site ouvert dans
+  le navigateur ne puisse lire la fiche.
+- `GET /api/pulse` (en-tête `X-Carte: pulse`) : la même fiche en JSON, pour
+  la carte.
+
+Sur la carte, onglet **Joueurs > Fiche** : « ouvrir la fiche complète »
+ouvre la page du mod dans une seconde fenêtre (aussi au clic droit, ou en
+cliquant l'encadré en bas à gauche). Les cases « afficher sur la carte »
+choisissent les valeurs montrées en bas à gauche : santé, faim, soif,
+fatigue et endurance par défaut. L'encadré technique (coordonnées, zoom) qui
+occupait cet endroit est masqué par défaut, case « encadré coordonnées et
+zoom » dans **Carte > Calques**.
+
+Écarts avec le mod : la barre d'actions rapides est un objet Lua invisible
+depuis Java, le panneau correspondant liste donc les objets accrochés au
+personnage. Pas d'extensions. Les textes de la page restent en anglais sauf
+si le mod a déjà tourné une fois en solo (il écrit alors `lang.txt`) ; les
+valeurs venant du jeu sont traduites.
+
+Option : `pulse=<ms>`, défaut 1000, 250 au minimum, `0` pour ne rien écrire.
+Il faut relancer le jeu après avoir remplacé le jar.

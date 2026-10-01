@@ -17,6 +17,11 @@ La carte est statique a deux exceptions pres :
   - GET /api/vehicules/icone?s=Base.CarNormal&p=0&v=dessus renvoie l'icone
     rendue du modele 3D (v = dessus ou 34), en cache dans vehicules-icones/.
     Voir icones_vehicules.py.
+  - GET /pulse.html sert la page du mod PZ Pulse, lue la ou le mod est
+    installe sur ce PC, et /api/pulse/data.txt, heartbeat.txt et lang.txt
+    les fichiers qu'elle recharge, tires de ~/Zomboid/pz-export/pulse.json.
+    GET /api/pulse renvoie la meme fiche en JSON pour la carte. Lecture
+    seule, voir pulse.py.
 
 Rien d'autre n'a besoin de flask ni de waitress, la bibliotheque standard
 suffit.
@@ -34,6 +39,7 @@ import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
+import pulse
 import vehicules
 
 # Reglables pour lancer une instance de test a cote de la vraie, sans
@@ -207,7 +213,71 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Cache-Control', 'no-cache, must-revalidate')
         super().end_headers()
 
+    def meme_origine(self):
+        """Vrai si la requete vient d'une page de la carte elle-meme.
+
+        Les fichiers de PZ Pulse sont charges par balise <script>, qui ne peut
+        pas porter d'en-tete X-Carte. Sans autre garde, n'importe quel site
+        ouvert dans le navigateur pourrait les inclure et lire la fiche du
+        personnage. Les navigateurs indiquent l'origine de chaque requete dans
+        Sec-Fetch-Site ; a defaut, on se rabat sur Referer.
+        """
+        site = self.headers.get('Sec-Fetch-Site')
+        if site is not None:
+            return site in ('same-origin', 'none')
+        ref = self.headers.get('Referer') or ''
+        hote = self.headers.get('Host') or ''
+        return bool(hote) and ref.startswith('http://%s/' % hote)
+
+    def repondre_texte(self, code, texte, type_mime):
+        corps = texte.encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', type_mime)
+        self.send_header('Content-Length', str(len(corps)))
+        self.send_header('Cache-Control', 'no-store')
+        self.end_headers()
+        self.wfile.write(corps)
+
+    def servir_pulse(self, chemin):
+        if chemin in ('/pulse', '/pulse/', '/pulse.html'):
+            # La page du mod trouve ses donnees grace a ?d=, qu'elle lit dans
+            # l'URL : on l'ajoute si on arrive sans.
+            if 'd=' not in self.path.split('?', 1)[-1] or chemin != '/pulse.html':
+                self.send_response(302)
+                self.send_header('Location', '/pulse.html?d=/api/pulse/')
+                self.send_header('Content-Length', '0')
+                self.end_headers()
+                return
+            p = pulse.page()
+            if not p:
+                self.repondre_texte(404, pulse.page_absente(), 'text/html; charset=utf-8')
+                return
+            with open(p, encoding='utf-8') as f:
+                self.repondre_texte(200, f.read(), 'text/html; charset=utf-8')
+            return
+        if chemin == '/api/pulse':
+            if self.headers.get('X-Carte') != 'pulse':
+                self.send_error(403, 'en-tete X-Carte manquant')
+                return
+            self.repondre_json(*pulse.lire())
+            return
+        if not self.meme_origine():
+            self.send_error(403, 'reserve aux pages de la carte')
+            return
+        nom = chemin[len('/api/pulse/'):]
+        texte = {'data.txt': pulse.data, 'heartbeat.txt': pulse.heartbeat,
+                 'lang.txt': pulse.langue}.get(nom, lambda: None)()
+        if texte is None:
+            # Comme le fichier absent du mod : la page sait l'interpreter.
+            self.send_error(404)
+            return
+        self.repondre_texte(200, texte, 'text/javascript; charset=utf-8')
+
     def do_GET(self):
+        chemin = self.path.split('?', 1)[0]
+        if chemin in ('/pulse', '/pulse/', '/pulse.html', '/api/pulse') or chemin.startswith('/api/pulse/'):
+            self.servir_pulse(chemin)
+            return
         if self.path.split('?', 1)[0] == '/api/traces':
             if self.headers.get('X-Carte') != 'traces':
                 self.send_error(403, 'en-tete X-Carte manquant')

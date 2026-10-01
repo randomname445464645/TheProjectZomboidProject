@@ -53,6 +53,9 @@ import zombie.util.list.PZArrayList;
  *                          defaut 1000, 0 pour ne pas l'ecrire
  *     journal=0            n'enregistre pas les deplacements (voir Journal) ;
  *                          par defaut ils sont notes dans traces/AAAA-MM-JJ.ndjson
+ *     pulse=<ms>           intervalle de la fiche du personnage (pulse.json,
+ *                          format du mod PZ Pulse), defaut 1000, 250 au
+ *                          minimum, 0 pour ne pas l'ecrire (voir Pulse)
  *     vehicules=<s>        intervalle de releve des vehicules, defaut 1 (decimales
  *                          acceptees, 0,2 au minimum), 0 pour
  *                          ne pas les relever (voir Vehicules, JournalVehicules)
@@ -89,6 +92,10 @@ public final class Agent {
     // carte. Le releve complet d'une soixantaine de vehicules ne coute que
     // quelques millisecondes.
     private static long periodeVehiculesMs = 1000L;
+    // Fiche du personnage au format PZ Pulse (voir Pulse). Une seconde : la
+    // page du mod se contente de 500 ms par defaut, mais la sante et les
+    // besoins bougent lentement et la fiche complete fait une dizaine de Ko.
+    private static long periodePulseMs = 1000L;
 
     // Signature de la derniere version vue de chaque case, pour n'ecrire que
     // ce qui a change. Cle = (x, y, z) empaquetes, valeur = hachage du contenu.
@@ -109,6 +116,12 @@ public final class Agent {
             v.setPriority(Thread.MIN_PRIORITY);
             v.start();
         }
+        if (periodePulseMs > 0) {
+            Thread u = new Thread(Agent::bouclePulse, "pz-export-pulse");
+            u.setDaemon(true);
+            u.setPriority(Thread.MIN_PRIORITY);
+            u.start();
+        }
         Thread t = new Thread(Agent::boucle, "pz-export");
         t.setDaemon(true);                 // ne retient jamais l'arret du jeu
         t.setPriority(Thread.MIN_PRIORITY);
@@ -121,7 +134,8 @@ public final class Agent {
         }
         System.out.println("[pz-export] agent actif, sortie=" + sortie
                 + " periode=" + (periodeMs / 1000) + "s tout=" + tout
-                + " position=" + periodePositionMs + "ms vehicules=" + periodeVehiculesMs + "ms");
+                + " position=" + periodePositionMs + "ms vehicules=" + periodeVehiculesMs + "ms"
+                + " pulse=" + periodePulseMs + "ms");
     }
 
     private static void lireOptions(String args) {
@@ -147,6 +161,11 @@ public final class Agent {
                     try { periodeVehiculesMs = Math.max(0L, Math.round(Double.parseDouble(val) * 1000)); }
                     catch (NumberFormatException ignore) { }
                     if (periodeVehiculesMs > 0 && periodeVehiculesMs < 200) periodeVehiculesMs = 200;
+                }
+                case "pulse" -> {
+                    try { periodePulseMs = Math.max(0L, Long.parseLong(val)); }
+                    catch (NumberFormatException ignore) { }
+                    if (periodePulseMs > 0 && periodePulseMs < 250) periodePulseMs = 250;
                 }
                 case "tout"   -> tout = "1".equals(val) || "true".equalsIgnoreCase(val);
             }
@@ -383,6 +402,55 @@ public final class Agent {
             } catch (Throwable e) {
                 if (erreurs++ % 60 == 0) {
                     System.out.println("[pz-export] vehicules ignores : " + e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Fiche du personnage : pulse.json, a cote de position.json.
+     *
+     *     {"t":ms,"etat":"play"|"dead"|"nochar","seq":n,"interval":ms,"data":{...}}
+     *
+     * "data" est l'objet que le mod PZ Pulse ecrit dans data.txt, absent hors
+     * partie. "seq" n'avance que si "data" a change : la page du mod ne
+     * redessine qu'a ce moment-la. Le fichier, lui, est reecrit a chaque tour,
+     * et "t" sert de pouls : un "t" fige veut dire jeu ferme.
+     */
+    private static void bouclePulse() {
+        Path fin = Paths.get(sortie).resolveSibling("pulse.json");
+        Path tmp = Paths.get(sortie).resolveSibling("pulse.json.tmp");
+        String dernier = null;
+        long seq = 0;
+        int erreurs = 0;
+        while (true) {
+            try {
+                Thread.sleep(periodePulseMs);
+                IsoPlayer j = IsoPlayer.getInstance();
+                String etat = j == null ? "nochar" : j.isDead() ? "dead" : "play";
+                String data = null;
+                if (j != null) {
+                    StringBuilder d = new StringBuilder(16384);
+                    Pulse.json(d, Pulse.lire(j, (int) periodePulseMs));
+                    data = d.toString();
+                    if (!data.equals(dernier)) { dernier = data; seq++; }
+                }
+                StringBuilder sb = new StringBuilder(data == null ? 128 : data.length() + 128);
+                sb.append("{\"t\":").append(System.currentTimeMillis())
+                  .append(",\"etat\":\"").append(etat)
+                  .append("\",\"seq\":").append(seq)
+                  .append(",\"interval\":").append(periodePulseMs);
+                if (data != null) sb.append(",\"data\":").append(data);
+                sb.append('}');
+                Files.writeString(tmp, sb.toString(), StandardCharsets.UTF_8);
+                Files.move(tmp, fin, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+                erreurs = 0;
+            } catch (InterruptedException e) {
+                return;
+            } catch (Throwable e) {
+                if (erreurs++ % 60 == 0) {
+                    System.out.println("[pz-export] pulse ignore : " + e);
                 }
             }
         }
