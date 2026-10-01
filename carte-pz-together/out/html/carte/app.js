@@ -773,7 +773,9 @@ function majConsigne() {
   } else if (trajet.etat.pose) {
     consigne(trajet.etat.mode === 'auto'
       ? 'Clique les points de passage. Le trajet suit les routes. Echap pour arreter.'
-      : 'Clique les points de passage. Trace en ligne droite. Echap pour arreter.');
+      : trajet.etat.mode === 'route'
+        ? 'Clique les points de ta route, puis "enregistrer" dans le panneau. Echap pour arreter.'
+        : 'Clique les points de passage. Trace en ligne droite. Echap pour arreter.');
   } else {
     consigne('');
   }
@@ -965,6 +967,14 @@ function initTrajetPanneau() {
     });
   }
   $('trajetVider').addEventListener('click', () => trajet.vider());
+  $('routeEnregistrer').addEventListener('click', () => {
+    if (trajet.enregistrerBrouillon($('nomRoute').value)) $('nomRoute').value = '';
+  });
+  $('routeRetour').addEventListener('click', () => trajet.annulerPointBrouillon());
+  $('routeAbandon').addEventListener('click', () => trajet.abandonnerBrouillon());
+  $('evitToutes').addEventListener('click', () => trajet.eviterToutes(true));
+  $('guidage').addEventListener('change', function () { trajet.activerGuidage(this.checked); });
+  $('evitAucune').addEventListener('click', () => trajet.eviterToutes(false));
   $('trajetInverser').addEventListener('click', () => {
     trajet.definirEtapes(trajet.etat.etapes.slice().reverse());
   });
@@ -986,22 +996,57 @@ function majPanneauTrajet() {
     const m = b.dataset.trajet;
     b.classList.toggle('actif', m === 'off' ? !trajet.etat.pose : m === trajet.etat.mode);
   }
-  const pose = trajet.etat.pose
-    ? 'Chaque clic sur la carte ajoute une etape. Echap pour arreter.'
-    : 'Clique auto ou manuel pour poser des etapes sur la carte. '
+  const t = trajet.etat;
+  const enRoute = t.mode === 'route';
+  const pose = t.pose
+    ? (enRoute ? 'Chaque clic ajoute un point a la route. Echap pour arreter.'
+      : 'Chaque clic sur la carte ajoute une etape. Echap pour arreter.')
+    : 'Choisis GPS ou ligne droite pour poser des etapes sur la carte. '
       + 'Depuis l\'onglet Bases, "depart" et "arrivee" remplissent le trajet.';
-  $('aideTrajet').textContent = pose + ' ' + (trajet.etat.mode === 'auto'
-    ? "Auto : le trajet suit une grille de cout lue dans les tuiles du jeu, a 8 cases par pixel. Le bitume coute 1, un sol interieur 2, l'herbe 5, l'eau est infranchissable."
-    : 'Manuel : les etapes se relient en ligne droite, sans tenir compte du terrain.');
+  $('aideTrajet').textContent = pose + ' ' + (t.mode === 'auto'
+    ? "GPS : le trajet ne roule que sur les cases de chaussee lues dans les tuiles du jeu (bitume, gravier, chemins de terre), a 4 cases pres. Une etape posee hors route rejoint la plus proche a pied, en pointilles."
+    : enRoute
+      ? 'Route dessinee : une fois enregistree, le GPS peut l\'emprunter comme une vraie route. Pratique pour un chemin dans les bois ou une breche dans une cloture.'
+      : 'Ligne droite : les etapes se relient sans tenir compte du terrain.');
+  $('boutonsBrouillon').hidden = !enRoute;
+  $('boutonsEtapes').hidden = enRoute;
+  $('routeEnregistrer').disabled = t.brouillon.length < 2;
+  $('routeRetour').disabled = !t.brouillon.length;
+  majVillesEtRoutes();
+  $('guidage').checked = t.guidage;
+  $('ligneGuidage').hidden = t.mode !== 'auto';
+  const g = $('etatGuidage');
+  g.textContent = !t.guidage ? ''
+    : !joueur.enDirect() ? 'en attente de ta position en direct (jeu lance, agent actif)'
+    : (t.guide || 'suit ta position') + (t.etapes.length > 1 && t.prochaine < t.etapes.length
+      ? ' · prochaine etape : ' + (t.prochaine + 1) : '');
 
   const r = $('resumeTrajet');
   r.textContent = '';
-  if (trajet.etat.distance > 0) {
+  if (enRoute) {
+    if (t.brouillon.length) {
+      const gros = document.createElement('div');
+      gros.className = 'gros';
+      let d = 0;
+      for (let i = 1; i < t.brouillon.length; i++) {
+        d += Math.hypot(t.brouillon[i].x - t.brouillon[i - 1].x, t.brouillon[i].y - t.brouillon[i - 1].y);
+      }
+      gros.textContent = t.brouillon.length + ' points, ' + Math.round(d).toLocaleString('fr-FR') + ' cases';
+      r.appendChild(gros);
+    }
+  } else if (trajet.etat.distance > 0) {
     const gros = document.createElement('div');
     gros.className = 'gros';
     gros.textContent = trajet.etat.distance.toLocaleString('fr-FR') + ' cases';
     r.appendChild(gros);
-    const t = document.createElement('table');
+    if (t.distanceAcces > 0) {
+      const a = document.createElement('div');
+      a.className = 'aide';
+      a.textContent = 'dont ' + Math.round(t.distanceAcces).toLocaleString('fr-FR')
+        + ' cases a pied pour rejoindre la route';
+      r.appendChild(a);
+    }
+    const tab = document.createElement('table');
     for (const [nom, secondes] of trajet.durees()) {
       const tr = document.createElement('tr');
       const a = document.createElement('td');
@@ -1010,16 +1055,16 @@ function majPanneauTrajet() {
       b.className = 'v';
       b.textContent = dureeTexte(secondes);
       tr.appendChild(a); tr.appendChild(b);
-      t.appendChild(tr);
+      tab.appendChild(tr);
     }
-    r.appendChild(t);
+    r.appendChild(tab);
     const note = document.createElement('div');
     note.className = 'aide';
     note.textContent = 'Vitesses supposees (1,4 / 3 / 14 cases par seconde), '
       + 'pas mesurees dans le jeu : a prendre comme un ordre de grandeur.';
     r.appendChild(note);
   }
-  if (trajet.etat.message) {
+  if (trajet.etat.message && !enRoute) {
     const m = document.createElement('div');
     m.className = 'aide';
     m.textContent = trajet.etat.message;
@@ -1050,6 +1095,65 @@ function majPanneauTrajet() {
   });
 }
 
+function majVillesEtRoutes() {
+  const t = trajet.etat;
+  const hote = $('listeVilles');
+  hote.textContent = '';
+  if (!t.zones.length) {
+    const p = document.createElement('span');
+    p.className = 'aide';
+    p.textContent = trajet.reseauPret() ? 'aucune ville connue' : 'chargement du reseau...';
+    hote.appendChild(p);
+  }
+  for (const z of t.zones) {
+    const l = document.createElement('label');
+    const c = document.createElement('input');
+    c.type = 'checkbox';
+    c.checked = t.evitees.includes(z.nom);
+    c.addEventListener('change', () => trajet.eviterVille(z.nom, c.checked));
+    l.appendChild(c);
+    l.appendChild(document.createTextNode(z.nom));
+    hote.appendChild(l);
+  }
+  $('nbEvitees').textContent = t.evitees.length ? t.evitees.length + ' evitee' + (t.evitees.length > 1 ? 's' : '') : '';
+  if (t.evitees.length) $('blocVilles').open = true;
+
+  const lr = $('listeRoutes');
+  lr.textContent = '';
+  $('nbRoutes').textContent = t.routes.length ? String(t.routes.length) : '';
+  if (!t.routes.length) {
+    const p = document.createElement('p');
+    p.className = 'aide';
+    p.textContent = 'Aucune. Bouton "dessiner une route" plus haut.';
+    lr.appendChild(p);
+  }
+  t.routes.forEach((route, i) => {
+    const el = document.createElement('div');
+    el.className = 'etape';
+    const rang = document.createElement('b');
+    rang.className = 'rang';
+    rang.textContent = String(i + 1);
+    const ou = document.createElement('span');
+    ou.className = 'ou';
+    ou.textContent = route.nom + ' · ' + trajet.longueurRoute(route).toLocaleString('fr-FR') + ' cases';
+    el.appendChild(rang);
+    el.appendChild(ou);
+    el.appendChild(bouton('voir', () => {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const p of route.points) {
+        x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x);
+        y0 = Math.min(y0, p.y); y1 = Math.max(y1, p.y);
+      }
+      cadrerSur(x0, y0, x1, y1, 60);
+      demanderRendu(true);
+    }));
+    el.appendChild(bouton('x', () => {
+      if (confirm('Supprimer la route "' + route.nom + '" ?')) trajet.supprimerRoute(i);
+    }));
+    lr.appendChild(el);
+  });
+}
+
 function dureeTexte(s) {
   if (s < 60) return s + ' s';
   if (s < 3600) return Math.floor(s / 60) + ' min ' + String(s % 60).padStart(2, '0');
@@ -1059,6 +1163,7 @@ function dureeTexte(s) {
 // --- joueur en direct -------------------------------------------------------
 
 function majJoueurUI() {
+  trajet.suivrePosition(joueur.positionMoi(), joueur.enDirect());
   const b = $('suivre');
   // Le bouton n'apparait que si une position existe : sans agent dans le jeu,
   // il n'y a personne a suivre.

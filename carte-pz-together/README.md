@@ -69,11 +69,13 @@ quoi qu'il arrive. Restreindre l'emprise ne fait donc pas gagner de temps.
 
 ```
 out/html/carte.html        page
-out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, vehicules.js, app.js
+out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, vehicules.js, itineraire.js, app.js
 out/html/serveur.py        serveur statique, bibliotheque standard seule
 out/html/vehicules.py      vehicules : releve en direct, journal agrege, vehicles.db
 out/html/icons/            10 sprites extraits de UI2.pack
 out/html/markers.json      1860 marqueurs
+out/html/map_data/routes/  reseau routier et zones urbaines du GPS
+outils/itineraire/         construction du reseau routier
 pzmap2dzi/                 l'outil de rendu, avec les correctifs
 docs/                      le patch contre l'amont
 ```
@@ -128,6 +130,33 @@ Les tuiles sont servies avec un cache d'une semaine. Un changement de
 px d'un cote, 512 de l'autre). D'ou le jeton `?r=` dans `urlTuile()`, derive de
 la geometrie. Un nouveau rendu de meme geometrie ne le bouscule pas : dans ce
 cas, incrementer `VERSION_TUILES` dans `carte/geometrie.js`.
+
+### GPS (onglet Trajet)
+
+Le GPS ne roule que sur la chaussee. `outils/itineraire/construire-routes.py`
+lit la couche z=0 de chaque cellule et garde la surface visible de chaque case
+(bitume, gravier, chemin de terre ; murs et sols interieurs exclus), par blocs
+de 4 x 4 cases. Les nappes de terre (champs laboures, cours) sont retirees. Il
+en sort `map_data/routes/routes.png`, ou chaque pixel de route est un noeud
+relie a ses voisins, et `villes.png`, les zones baties nommees d'apres les
+`spawnpoints.lua` du jeu. Le navigateur fait un A* sur ce reseau.
+
+Une etape posee hors route rejoint la route la plus proche a pied (trait en
+pointilles). Une ville evitee n'est pas interdite, ses routes comptent quinze
+fois plus long. Les routes dessinees a la main (bouton "dessiner une route")
+sont gardees dans le navigateur et entrent dans le reseau : le GPS peut les
+emprunter.
+
+A refaire apres un changement de carte ou de mods (environ 80 s, 4 processus
+d'environ 40 Mo) :
+
+```bash
+.venv/bin/python outils/itineraire/construire-routes.py
+outils/itineraire/suivi-routes.sh    # suivi en direct, dans un autre terminal
+```
+
+Si le jeu tourne, le lancer sous plafond memoire :
+`systemd-run --user --scope -q -p MemoryMax=2G -p MemorySwapMax=0` devant.
 
 ## Les correctifs de pzmap2dzi
 
