@@ -16,6 +16,9 @@ out/html/map_data/mod_maps/*/base
 # outils/agent-monde/rendre-calque.py a partir du releve, qui est lui-meme
 # propre a chaque joueur.
 out/html/map_data/constructions
+# Base et journal du rendu progressif (rendu-progressif.sh) : derives du
+# releve, propres a chaque joueur, environ 1 Go.
+out/rendu-progressif/
 out/html/map_data/rooms
 out/html/map_data/objects
 out/html/map_data/mod_maps/*/rooms

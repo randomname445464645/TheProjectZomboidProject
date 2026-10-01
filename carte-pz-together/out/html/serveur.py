@@ -137,14 +137,21 @@ def lire_jour(jour):
 # virtuel du projet, pas de celui du systeme.
 PROJET = os.path.normpath(os.path.join(RACINE, '..', '..'))
 OUTILS = os.path.join(PROJET, 'outils', 'agent-monde')
+# Une seule etape : le rendu progressif, en une passe et sous plafonds
+# (memoire, CPU, priorite idle), qui ne relit que la fin du releve et ne
+# redessine que les tuiles touchees. L'ancien enchainement convertir.py puis
+# rendre-calque.py chargeait tout le releve en memoire et occupait 8 coeurs :
+# lance pendant une partie, il exposait le jeu a un arret par manque de RAM.
+# Il reste disponible a la main pour un rendu complet.
+RENDU = os.path.join(PROJET, 'rendu-progressif.sh')
 ETAPES = [
-    ('releve', os.path.join(OUTILS, 'convertir.py')),
-    ('tuiles', os.path.join(OUTILS, 'rendre-calque.py')),
+    ('tuiles', ['bash', RENDU, 'une-passe']),
 ]
 PYTHON_VENV = os.path.join(PROJET, '.venv', 'bin', 'python')
 
-# La synchronisation dure une quinzaine de minutes : le calcul des tuiles est
-# long. Elle tourne donc en TACHE DE FOND et la page interroge son etat. Une
+# La synchronisation peut durer : au premier passage le rendu progressif lit
+# tout le releve et refait toutes les tuiles, lentement, par politesse pour le
+# jeu. Elle tourne donc en TACHE DE FOND et la page interroge son etat. Une
 # requete HTTP ouverte pendant un quart d'heure serait coupee par le
 # navigateur bien avant la fin.
 _verrou_sync = threading.Lock()
@@ -155,12 +162,15 @@ _etat_sync = {'en_cours': False, 'etape': '', 'ligne': '', 'fini': False,
 def _executer_sync():
     python = PYTHON_VENV if os.path.isfile(PYTHON_VENV) else sys.executable
     try:
-        for nom, script in ETAPES:
+        for nom, commande in ETAPES:
+            if isinstance(commande, str):
+                commande = [python, commande]
+            script = commande[-1] if commande[0] == python else commande[1]
             if not os.path.isfile(script):
                 _etat_sync.update(ok=False, erreur='script introuvable : %s' % script)
                 return
             _etat_sync.update(etape=nom, ligne='')
-            p = subprocess.Popen([python, script], stdout=subprocess.PIPE,
+            p = subprocess.Popen(commande, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, text=True, bufsize=1)
             derniere = ''
             for ligne in p.stdout:

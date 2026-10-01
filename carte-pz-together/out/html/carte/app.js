@@ -28,7 +28,7 @@ import { initConstructions, basculerConstructions, dessinerConstructions,
          disponible as constructionsDisponibles,
          nombreCases as nbConstructions,
          surChargement as constructionsSurChargement,
-         rechargerConstructions } from './constructions.js';
+         rechargerConstructions, surveillerConstructions } from './constructions.js';
 
 const $ = id => document.getElementById(id);
 
@@ -1923,6 +1923,9 @@ async function demarrer() {
   $('ligneSync').hidden = false;       // la premiere synchro cree le calque
   initSync();
   majCalqueConstructions();
+  // Le rendu progressif ecrit des tuiles en continu : on les affiche au fil
+  // de l'eau, sans bouton ni rechargement de la page.
+  surveillerConstructions(() => { majCalqueConstructions(); demanderRendu(); });
 
   try {
     if (localStorage.getItem('pzcarte.rues') === '1') {

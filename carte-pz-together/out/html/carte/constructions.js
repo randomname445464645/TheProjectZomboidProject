@@ -16,7 +16,7 @@
 // Ce module ne garde donc que le pilotage : afficher ou masquer la couche, et
 // la recharger apres une synchronisation.
 
-import { pyramidesActives, chargerGeometrie, mode } from './geometrie.js';
+import { pyramidesActives, chargerGeometrie, rafraichirCalque, mode } from './geometrie.js';
 
 export let actif = false;
 
@@ -55,6 +55,34 @@ export async function rechargerConstructions() {
   const c = couche();
   if (c) c.masque = !actif;
   return !!c;
+}
+
+/**
+ * Suit le rendu progressif (rendu-progressif.sh) pendant qu'il tourne en fond.
+ *
+ * Toutes les 30 s, tant que le calque est affiche, une requete HEAD sur
+ * info.json : quelques octets, rien a decoder. Quand sa date change, on relit
+ * la liste des tuiles et leurs jetons ; seules les tuiles redessinees changent
+ * d'adresse, les autres restent en cache. Onglet cache : on ne demande rien.
+ */
+export function surveillerConstructions(apresMaj, periode = 30000) {
+  let derniere = null;
+  setInterval(async () => {
+    if (!actif || document.hidden || !disponible()) return;
+    let date;
+    try {
+      const r = await fetch('map_data/constructions/info.json', { method: 'HEAD', cache: 'no-store' });
+      if (!r.ok) return;
+      date = r.headers.get('Last-Modified');
+    } catch (e) { return; }
+    if (!date) return;
+    if (derniere !== null && date !== derniere && await rafraichirCalque()) {
+      const c = couche();
+      if (c) c.masque = !actif;
+      apresMaj();
+    }
+    derniere = date;
+  }, periode);
 }
 
 // --- compatibilite ---------------------------------------------------------

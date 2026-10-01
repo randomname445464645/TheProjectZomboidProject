@@ -137,6 +137,61 @@ Les cases sont dessinées dans l'ordre du peintre : étage croissant, puis
 profondeur isométrique croissante (`x + y`). Sans ce tri, un mur du fond
 recouvrirait un mur du premier plan.
 
+## Le rendu progressif, en tache de fond
+
+`convertir.py` puis `rendre-calque.py` refont tout à chaque fois : le relevé
+entier en mémoire (1,2 Go, 6,5 millions de cases), puis 29 000 tuiles sur 8
+cœurs. Plusieurs Gio de RAM pendant des dizaines de minutes : pendant une
+partie, c'est le jeu que le noyau tue faute de mémoire.
+
+`rendu-progressif.sh` fait le même travail par petits morceaux, et seulement
+là où quelque chose a changé :
+
+- il reprend la lecture du relevé là où il s'était arrêté (position en octets
+  mémorisée par fichier), par tranches de 8 Mo ;
+- les cases sont dans une base SQLite sur disque
+  (`out/rendu-progressif/cases.sqlite`), pas en mémoire ;
+- une case dont les sprites n'ont pas changé ne coûte qu'une comparaison ; une
+  case qui change marque les tuiles qu'elle touchait et celles qu'elle touche ;
+- il redessine ces tuiles par lots de 8 (2 quand le jeu tourne), les zones
+  jamais rendues puis les plus proches de toi d'abord, puis remonte la
+  pyramide au-dessus d'elles seulement ;
+- il dort entre deux lots (4 s, 12 s quand le jeu tourne), et se met en pause
+  tant que la mémoire disponible passe sous 3 Gio ou que le système est sous
+  pression (`/proc/pressure`).
+
+Le noyau ajoute ses plafonds : 1,5 Gio de RAM au plus et pas de swap (au-delà,
+c'est le rendu qui est tué), une moitié de cœur, priorité processeur et disque
+`idle` (il ne tourne que quand personne d'autre ne veut la machine), et score
+OOM maximal : si le noyau doit tuer quelque chose, il choisit le rendu, pas le
+jeu.
+
+```bash
+./rendu-progressif.sh demarrer      # en fond, service systemd utilisateur
+./rendu-progressif.sh suivi         # avancement en direct, Ctrl+C sort du suivi seulement
+./rendu-progressif.sh pause         # gel, rien n'est perdu
+./rendu-progressif.sh reprendre
+./rendu-progressif.sh arreter       # arrêt propre, reprise au prochain démarrage
+./rendu-progressif.sh une-passe     # met à jour puis s'arrête (c'est ce que fait le bouton synchroniser)
+```
+
+Plafonds réglables : `PZRENDU_MEMOIRE=2G PZRENDU_CPU=100% ./rendu-progressif.sh demarrer`.
+Les options du script (`--lot`, `--pause`, `--memoire-libre`, ...) passent
+après `demarrer` ; `outils/agent-monde/rendu-progressif.py --help` les liste.
+
+Le premier lancement lit tout le relevé (une quinzaine de minutes, jeu lancé)
+puis refait toutes les tuiles touchées, ce qui prend des heures à ce rythme.
+`--premier-import=nouveau` ne refait que les zones encore jamais rendues et
+fait confiance au rendu complet existant pour le reste. Ensuite, chaque
+passage ne coûte que ce que tu as exploré depuis.
+
+La carte affiche les tuiles au fil de l'eau : toutes les 30 s, tant que le
+calque est coché, elle regarde si `info.json` a changé (requête `HEAD`) et ne
+recharge que les tuiles redessinées, grâce au jeton par tuile que le rendu
+écrit dans `info.json` (`versions`). Les autres restent en cache.
+
+Repartir de zéro après avoir effacé le relevé : `--reinitialiser`.
+
 ## Effacer un relevé pour repartir de zéro
 
 **Arrêter le jeu d'abord.** Renommer ou supprimer le fichier pendant que

@@ -19,6 +19,7 @@ import {
   EMPRISE, pyramidesActives, mode,
   mondeVersPlanX, mondeVersPlanY, planVersMondeX, planVersMondeY,
   niveauPour, facteurNiveau, tailleNiveau, urlTuile, tuileExiste, coteCasePlan,
+  versionTuile,
 } from './geometrie.js';
 
 // Bornes de zoom par mode. Elles ne sont pas les memes parce qu'une unite de
@@ -240,7 +241,7 @@ export function dessinerTuiles() {
 
         // La version du calque entre dans la cle : apres une synchronisation,
         // une tuile deja a l'ecran doit etre remplacee, pas gardee.
-        const cle = `${p.nom}|${p.version || ''}|${niveau}|${tx}|${ty}`;
+        const cle = `${p.nom}|${p.version || ''}|${p.calque ? versionTuile(p, niveau, tx, ty) : ''}|${niveau}|${tx}|${ty}`;
         gardees.add(cle);
 
         // Le dernier rang de tuiles d'un niveau est rogne : sa taille reelle

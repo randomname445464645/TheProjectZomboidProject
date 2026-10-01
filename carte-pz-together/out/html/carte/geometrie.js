@@ -223,7 +223,33 @@ async function chargerCalque(p, r) {
   // du 22/09. info.json, lui, n'est jamais mis en cache, donc la date est
   // toujours fraiche.
   p.version = String(info.genere || '').replace(/\D/g, '');
+  // Jetons par tuile, poses par le rendu progressif (rendu-progressif.py) sur
+  // les seules tuiles redessinees depuis le dernier rendu complet : elles
+  // changent d'adresse, les autres restent dans le cache du navigateur.
+  p.versions = new Map();
+  for (const [niv, table] of Object.entries(info.versions || {})) {
+    p.versions.set(parseInt(niv, 10), table);
+  }
   p.absente = false;
+}
+
+/** Jeton propre a une tuile du calque, ou '' si elle date du rendu complet. */
+export function versionTuile(pyramide, niveau, tx, ty) {
+  const table = pyramide.versions && pyramide.versions.get(niveau);
+  return (table && table[`${tx}_${ty}`]) || '';
+}
+
+/**
+ * Relit le seul info.json du calque, sans toucher aux autres pyramides.
+ * Utilise pendant que le rendu progressif tourne en fond.
+ */
+export async function rafraichirCalque() {
+  const p = PYRAMIDES.find(x => x.calque);
+  if (!p || mode !== 'iso') return false;
+  try {
+    await chargerCalque(p, racine(p, mode));
+    return true;
+  } catch (e) { return false; }
 }
 
 /** Un mode est-il disponible ? Teste la seule pyramide vanilla, la moins chere. */
@@ -283,7 +309,13 @@ const VERSION_TUILES = 2;   // 2 : ajout du mode isometrique
 export function urlTuile(pyramide, niveau, tx, ty) {
   return `${pyramide.racine}/layer0_files/${niveau}/${tx}_${ty}.${pyramide.format}`
        + `?r=${VERSION_TUILES}.${mode}.${pyramide.sqr}.${pyramide.w}x${pyramide.h}`
-       + (pyramide.version ? '.' + pyramide.version : '');
+       + (pyramide.version ? '.' + pyramide.version : '')
+       + (pyramide.calque ? suffixeVersion(pyramide, niveau, tx, ty) : '');
+}
+
+function suffixeVersion(pyramide, niveau, tx, ty) {
+  const v = versionTuile(pyramide, niveau, tx, ty);
+  return v ? '.' + v : '';
 }
 
 /**
