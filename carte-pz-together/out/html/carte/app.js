@@ -575,6 +575,68 @@ function initExport() {
 
 // --- synchronisation du releve de l'agent ----------------------------------
 
+/**
+ * Case "rendu progressif en fond" : demarre ou arrete le service bride
+ * (rendu-progressif.sh) et affiche ou il en est. Etat relu toutes les 15 s,
+ * onglet visible seulement ; les tuiles, elles, arrivent par
+ * surveillerConstructions.
+ */
+function initRenduFond() {
+  const caseRendu = $('renduFond');
+  if (!caseRendu || caseRendu.dataset.pret) return;
+  caseRendu.dataset.pret = '1';
+  const etat = $('etatRenduFond');
+
+  const afficher = d => {
+    caseRendu.checked = !!d.actif;
+    if (!d.actif) { etat.textContent = ''; return; }
+    if (d.pause) etat.textContent = 'en pause : ' + d.pause;
+    else if (d.phase === 'lecture' && d.total) etat.textContent = `lecture ${Math.floor(100 * d.lus / d.total)} %`;
+    else if (d.phase === 'attente') etat.textContent = 'a jour';
+    else if (d.phase === 'rendu') etat.textContent = `${d.restantes} tuiles a faire`;
+    // Juste apres le demarrage, etat.json decrit encore l'arret precedent.
+    else etat.textContent = 'demarrage...';
+  };
+  const lire = async () => {
+    try {
+      const r = await fetch('/api/rendu', { headers: { 'X-Carte': 'rendu' } });
+      if (!r.ok) return;
+      $('labelRenduFond').hidden = false;
+      afficher(await r.json());
+    } catch (e) { /* serveur eteint : on garde l'affichage */ }
+  };
+
+  caseRendu.addEventListener('change', async () => {
+    const voulu = caseRendu.checked;
+    caseRendu.disabled = true;
+    etat.textContent = voulu ? 'demarrage...' : 'arret...';
+    try {
+      const r = await fetch('/api/rendu', {
+        method: 'POST',
+        headers: { 'X-Carte': 'rendu', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actif: voulu }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.ok) {
+        caseRendu.checked = !voulu;
+        etat.textContent = d.erreur || `erreur ${r.status}`;
+      } else {
+        afficher(d);
+        // On lance le rendu pour VOIR le resultat : on affiche le calque.
+        if (voulu && !$('calqueConstructions').checked) $('calqueConstructions').click();
+      }
+    } catch (e) {
+      caseRendu.checked = !voulu;
+      etat.textContent = 'serveur injoignable';
+    } finally {
+      caseRendu.disabled = false;
+    }
+  });
+
+  lire();
+  setInterval(() => { if (!document.hidden) lire(); }, 15000);
+}
+
 function initSync() {
   const bouton = $('sync' + 'Constructions');
   if (!bouton || bouton.dataset.pret) return;
@@ -1922,6 +1984,7 @@ async function demarrer() {
   });
   $('ligneSync').hidden = false;       // la premiere synchro cree le calque
   initSync();
+  initRenduFond();
   majCalqueConstructions();
   // Le rendu progressif ecrit des tuiles en continu : on les affiche au fil
   // de l'eau, sans bouton ni rechargement de la page.

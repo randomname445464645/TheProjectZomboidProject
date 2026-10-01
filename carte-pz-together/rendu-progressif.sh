@@ -92,6 +92,7 @@ case "$cmd" in
     ;;
 
   arreter)
+    actif || { echo "Pas en cours."; exit 0; }
     # SIGTERM : le lot en cours se termine, l'etat est enregistre. Un service
     # gele ne recevrait pas le signal, on le degele d'abord.
     systemctl --user thaw "$UNITE" 2>/dev/null

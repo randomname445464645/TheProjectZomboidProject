@@ -199,6 +199,47 @@ def demarrer_sync():
     return 202, {'ok': True, 'demarre': True}
 
 
+# --- rendu progressif en fond ------------------------------------------------
+# La case "rendu progressif en fond" de la carte demarre ou arrete le service
+# systemd utilisateur lance par rendu-progressif.sh. Le serveur ne fait que
+# relayer : les plafonds (memoire, CPU, priorite) sont poses par le script.
+UNITE_RENDU = 'pz-carte-rendu'
+ETAT_RENDU = os.path.join(PROJET, 'out', 'rendu-progressif', 'etat.json')
+
+
+def etat_rendu():
+    try:
+        actif = subprocess.run(['systemctl', '--user', 'is-active', '--quiet', UNITE_RENDU],
+                               timeout=5).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        actif = False
+    r = {'ok': True, 'actif': actif}
+    try:
+        with open(ETAT_RENDU, encoding='utf-8') as f:
+            e = json.load(f)
+        t = e.get('tuiles') or {}
+        lec = e.get('lecture') or {}
+        r.update(phase=e.get('phase'), pause=e.get('pause'),
+                 faites=t.get('faites', 0), restantes=t.get('restantes', 0),
+                 lus=lec.get('lus', 0), total=lec.get('total', 0))
+    except (OSError, ValueError):
+        pass
+    return 200, r
+
+
+def piloter_rendu(actif):
+    if not os.path.isfile(RENDU):
+        return 500, {'ok': False, 'erreur': 'script introuvable : %s' % RENDU}
+    try:
+        p = subprocess.run(['bash', RENDU, 'demarrer' if actif else 'arreter'],
+                           capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return 500, {'ok': False, 'erreur': str(e)}
+    if p.returncode != 0:
+        return 500, {'ok': False, 'erreur': (p.stderr or p.stdout).strip()[-300:] or 'echec'}
+    return etat_rendu()
+
+
 def etat_sync():
     e = dict(_etat_sync)
     e['secondes'] = int(time.time() - e['depuis']) if e['depuis'] else 0
@@ -341,6 +382,12 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self.repondre_json(*etat_sync())
             return
+        if self.path.split('?', 1)[0] == '/api/rendu':
+            if self.headers.get('X-Carte') != 'rendu':
+                self.send_error(403, 'en-tete X-Carte manquant')
+                return
+            self.repondre_json(*etat_rendu())
+            return
         super().do_GET()
 
     def repondre_json(self, code, reponse):
@@ -354,6 +401,19 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         chemin = self.path.split('?', 1)[0]
+        if chemin == '/api/rendu':
+            # Meme garde que la synchronisation, avec son propre en-tete.
+            if self.headers.get('X-Carte') != 'rendu':
+                self.send_error(403, 'en-tete X-Carte manquant')
+                return
+            try:
+                n = int(self.headers.get('Content-Length') or 0)
+                actif = bool(json.loads(self.rfile.read(min(n, 1024)) or b'{}').get('actif'))
+            except (ValueError, AttributeError):
+                self.repondre_json(400, {'ok': False, 'erreur': 'corps JSON attendu : {"actif": true}'})
+                return
+            self.repondre_json(*piloter_rendu(actif))
+            return
         if chemin != '/api/sync':
             self.send_error(404)
             return

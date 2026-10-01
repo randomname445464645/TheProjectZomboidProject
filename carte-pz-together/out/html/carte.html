@@ -302,9 +302,14 @@
         </label>
         <!-- Le bouton de rendu est colle a sa case. -->
         <div class="ligne-sync" id="ligneSync" hidden>
-          <button id="syncConstructions" class="principal" title="Relit ce que l'agent a releve en jeu et recalcule les tuiles du calque. Environ 15 min.">rendre mes constructions</button>
+          <button id="syncConstructions" class="principal" title="Met a jour le calque une fois, en ne redessinant que ce qui a change depuis le dernier passage.">rendre mes constructions</button>
           <span class="reel" id="etatSync"></span>
         </div>
+        <label class="case-calque" id="labelRenduFond" hidden
+               title="Redessine en continu, en tache de fond, ce que tu explores et construis. Bride pour ne pas gener le jeu (1,5 Gio de RAM, une moitie de coeur, priorite minimale) : lent, mais sans lag. Les nouvelles tuiles apparaissent toutes seules.">
+          <input type="checkbox" id="renduFond"> rendu progressif en fond
+          <i class="nb" id="etatRenduFond"></i>
+        </label>
         <p class="aide">Ta position, les vehicules et les traces se reglent
           dans l'onglet Joueurs ; la portee des talkies dans Radio.</p>
       </div>
@@ -341,6 +346,6 @@
   </section>
 </div>
 
-<script type="module" src="carte/app.js?v=49"></script>
+<script type="module" src="carte/app.js?v=50"></script>
 </body>
 </html>
