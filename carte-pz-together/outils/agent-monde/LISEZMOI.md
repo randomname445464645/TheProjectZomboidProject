@@ -153,10 +153,10 @@ là où quelque chose a changé :
   (`out/rendu-progressif/cases.sqlite`), pas en mémoire ;
 - une case dont les sprites n'ont pas changé ne coûte qu'une comparaison ; une
   case qui change marque les tuiles qu'elle touchait et celles qu'elle touche ;
-- il redessine ces tuiles par lots de 8 (2 quand le jeu tourne), les zones
-  jamais rendues puis les plus proches de toi d'abord, puis remonte la
-  pyramide au-dessus d'elles seulement ;
-- il dort entre deux lots (4 s, 12 s quand le jeu tourne), et se met en pause
+- il redessine ces tuiles par lots de 16 (8 quand le jeu tourne), les zones
+  jamais rendues puis les plus proches de toi d'abord, et recompose les
+  niveaux supérieurs de la pyramide par paquets de 64 tuiles ;
+- il dort entre deux lots (2 s, 6 s quand le jeu tourne), et se met en pause
   tant que la mémoire disponible passe sous 3 Gio ou que le système est sous
   pression (`/proc/pressure`).
 
@@ -179,8 +179,11 @@ Plafonds réglables : `PZRENDU_MEMOIRE=2G PZRENDU_CPU=100% ./rendu-progressif.sh
 Les options du script (`--lot`, `--pause`, `--memoire-libre`, ...) passent
 après `demarrer` ; `outils/agent-monde/rendu-progressif.py --help` les liste.
 
-Le premier lancement lit tout le relevé (une quinzaine de minutes, jeu lancé)
-puis refait toutes les tuiles touchées, ce qui prend des heures à ce rythme.
+Le premier lancement lit tout le relevé puis refait toutes les tuiles
+touchées. Mesuré le 1er octobre 2026, jeu lancé, sur un relevé de 1,2 Go :
+12 min de lecture, puis 0,7 tuile/s pour 37 300 tuiles, soit environ 14 h,
+avec 240 Mo de RAM pour le rendu. Les tuiles produites sont identiques au
+pixel près à celles de `rendre-calque.py` là où rien n'a changé.
 `--premier-import=nouveau` ne refait que les zones encore jamais rendues et
 fait confiance au rendu complet existant pour le reste. Ensuite, chaque
 passage ne coûte que ce que tu as exploré depuis.

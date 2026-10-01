@@ -177,6 +177,8 @@ CREATE TABLE IF NOT EXISTS sprites (
     dossier TEXT, w INTEGER, h INTEGER, ox INTEGER, oy INTEGER);
 CREATE TABLE IF NOT EXISTS fichiers (chemin TEXT PRIMARY KEY, ino INTEGER, pos INTEGER);
 CREATE TABLE IF NOT EXISTS sales (tx INTEGER, ty INTEGER, PRIMARY KEY (tx, ty)) WITHOUT ROWID;
+-- tuiles de plein niveau refaites dont les niveaux superieurs restent a recomposer
+CREATE TABLE IF NOT EXISTS a_remonter (tx INTEGER, ty INTEGER, PRIMARY KEY (tx, ty)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS reglages (cle TEXT PRIMARY KEY, valeur TEXT);
 """
 
@@ -593,10 +595,14 @@ def main():
     ap.add_argument('--etat', help='dossier de travail (defaut : out/rendu-progressif)')
     ap.add_argument('--saison', default='summer2')
     ap.add_argument('--une-passe', action='store_true', help="s'arreter quand tout est a jour")
-    ap.add_argument('--lot', type=int, default=8, help='tuiles par lot')
-    ap.add_argument('--pause', type=float, default=4, help='secondes de repos entre deux lots')
+    ap.add_argument('--lot', type=int, default=16, help='tuiles par lot (moitie quand le jeu tourne)')
+    ap.add_argument('--pause', type=float, default=2, help='secondes de repos entre deux lots')
     ap.add_argument('--facteur-jeu', type=float, default=3,
-                    help='multiplie la pause et divise le lot quand le jeu tourne')
+                    help='multiplie la pause quand le jeu tourne')
+    ap.add_argument('--remonter', type=int, default=64,
+                    help='tuiles refaites avant de recomposer les niveaux superieurs')
+    ap.add_argument('--remonter-delai', type=float, default=120,
+                    help='secondes au plus avant de recomposer les niveaux superieurs')
     ap.add_argument('--tranche', type=float, default=8, help='Mo de releve lus par tranche')
     ap.add_argument('--attente', type=float, default=60, help='secondes entre deux verifications du releve')
     ap.add_argument('--memoire-libre', type=float, default=3.0,
@@ -658,7 +664,27 @@ def main():
     tuiles = {'faites': 0, 'videes': 0, 'restantes': 0, 'octets': 0}
     suivi.ecrire(phase='lecture' if a_lire else 'rendu', lecture=lecture, tuiles=tuiles)
     derniere_verif = time.time()
+    derniere_remontee = time.time()
     modifie = False
+
+    def remonter_attente(force=False):
+        """Recompose les niveaux superieurs des tuiles refaites, par paquets.
+
+        Chaque niveau coute un encodage WebP par tuile parente : le faire a
+        chaque lot revenait a 22 encodages pour 2 tuiles utiles. Groupees, les
+        tuiles voisines partagent leurs parents. La liste est en base : un
+        arret entre les deux ne perd rien.
+        """
+        nonlocal derniere_remontee
+        attente = db.execute('SELECT tx, ty FROM a_remonter').fetchall()
+        if not attente:
+            return
+        if not force and len(attente) < args.remonter and time.time() - derniere_remontee < args.remonter_delai:
+            return
+        tuiles['octets'] += pyr.remonter(attente, jeton())
+        pyr.enregistrer(cases)
+        db.execute('DELETE FROM a_remonter')
+        derniere_remontee = time.time()
 
     while not arret:
         raison = raison_de_pause(args)
@@ -699,7 +725,7 @@ def main():
         premiere = False
 
         # 2. Rendu d'un lot de tuiles.
-        n = max(1, int(args.lot / (args.facteur_jeu if jeu else 1)))
+        n = max(1, args.lot // 2 if jeu else args.lot)
         lot, restantes = prochain_lot(db, pyr, geo, position_joueur(args.source, geo), n)
         if lot:
             tuiles.setdefault('debut', time.time())
@@ -714,12 +740,17 @@ def main():
                 if im is None and pyr.existe(geo.nmax, tx, ty):
                     tuiles['videes'] += 1
                 tuiles['octets'] += pyr.poser(geo.nmax, tx, ty, im, j)
-                db.execute('DELETE FROM sales WHERE tx=? AND ty=?', (tx, ty))
                 tuiles['faites'] += 1
-            tuiles['octets'] += pyr.remonter(faites, j)
+            # info.json d'abord : une tuile n'est rayee de la liste qu'une fois
+            # annoncee au viewer.
             pyr.enregistrer(cases)
-            modifie = True
+            db.execute('BEGIN')
+            db.executemany('DELETE FROM sales WHERE tx=? AND ty=?', faites)
+            db.executemany('INSERT OR IGNORE INTO a_remonter VALUES (?,?)', faites)
+            db.execute('COMMIT')
             tuiles['restantes'] = restantes - len(faites)
+            remonter_attente(force=not tuiles['restantes'])
+            modifie = True
             suivi.ecrire(phase='rendu', tuiles=tuiles, jeu=jeu, duree_lot=time.time() - t0)
             if args.une_passe:
                 print('tuiles : %d faites, %d restantes' % (tuiles['faites'], tuiles['restantes']), flush=True)
@@ -727,6 +758,7 @@ def main():
             continue
 
         # 3. Rien a faire.
+        remonter_attente(force=True)
         if args.une_passe:
             break
         if modifie:
