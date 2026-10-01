@@ -39,6 +39,21 @@ MAX_LIEUX = 20
 FORMAT_JOUR = re.compile(r'^\d{4}-\d{2}-\d{2}\.ndjson$')
 
 
+def _corriger_cap(v):
+    """Remet le cap dans le repere de la carte (x vers l'est, y vers le sud).
+
+    L'agent ecrit (avant.x, -avant.z), or le jeu passe du repere physique a
+    la carte par (x, +z) : BaseVehicle.getWorldPos ajoute origin.z a y. Le
+    signe en trop renversait les vehicules orientes nord-sud et donnait
+    l'image miroir des diagonales ; est-ouest etait juste, d'ou une erreur
+    "pas toujours". Corrige ici plutot que dans l'agent : le journal deja
+    ecrit est repare d'un coup, sans relancer le jeu.
+    """
+    cap = v.get('cap') if isinstance(v, dict) else None
+    if isinstance(cap, list) and len(cap) == 2 and isinstance(cap[1], (int, float)):
+        v['cap'] = [cap[0], -cap[1]]
+
+
 def lire_direct():
     """(code, reponse) : les vehicules autour du joueur, et l'age du releve."""
     try:
@@ -51,6 +66,8 @@ def lire_direct():
         return 503, {'ok': False, 'erreur': 'releve illisible : %s' % e}
     t = d.get('t')
     age = (time.time() * 1000 - t) / 1000 if isinstance(t, (int, float)) else None
+    for v in d.get('liste') or []:
+        _corriger_cap(v)
     return 200, {'ok': True, 'age': age, **d}
 
 
@@ -82,6 +99,7 @@ def _integrer(e):
     if t < f['premier']['t']:
         f['premier'] = vu
     if v:
+        _corriger_cap(v)
         f['fiche'] = v
     if isinstance(x, (int, float)) and isinstance(y, (int, float)):
         lieux = f['lieux']

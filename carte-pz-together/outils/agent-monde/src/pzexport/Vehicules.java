@@ -158,9 +158,11 @@ final class Vehicules {
         else if (d != null) conducteur = "?";
 
         // Cap : le vecteur avant du vehicule, dans le repere physique (x, y
-        // vers le haut, z). Verifie en jeu sur la place avant gauche, qui est
-        // devant le centre : son decalage suit (x, -z) dans le repere de la
-        // carte (x vers l'est, y vers le sud).
+        // vers le haut, z). ATTENTION : le signe de z est faux, la carte suit
+        // (x, +z) (voir BaseVehicle.getWorldPos). La carte le corrige a la
+        // lecture (out/html/vehicules.py, _corriger_cap) pour reparer aussi le
+        // journal deja ecrit : ne pas changer ce signe ici sans retirer
+        // cette correction.
         float capX = 0f, capY = 0f;
         try {
             Vector3f avant = v.getForwardVector(new Vector3f());
