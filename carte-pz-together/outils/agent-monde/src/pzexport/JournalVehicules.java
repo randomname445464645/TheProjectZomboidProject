@@ -28,7 +28,8 @@ import java.util.Set;
  *              Cle et position seulement : un vehicule qu'on conduit en
  *              ecrit une par lecture, la fiche complete y serait du gaspillage.
  *     "e":"p"  toujours la, une fois par PRESENCE ms. Cle et position seulement.
- *     "e":"f"  fin : absent de ABSENCE lectures de suite.
+ *     "e":"f"  fin : absent depuis ABSENCE ms. En temps et pas en nombre de
+ *              lectures : l'intervalle de releve est reglable.
  * Chaque ligne porte "t" (heure reelle, ms) et "h" (heure du monde de jeu).
  *
  * C'est le serveur de la carte qui en tire, pour chaque vehicule, la premiere
@@ -42,13 +43,13 @@ final class JournalVehicules {
 
     static final double DEPLACE = 3.0;          // cases
     static final long PRESENCE = 10 * 60_000L;  // ms
-    static final int ABSENCE = 3;               // lectures
+    static final long ABSENCE = 15_000L;        // ms
 
     private static final class Suivi {
         float x, y;
         String signature;
         long ecrit;
-        int manques;
+        long vu;
     }
 
     private final Path dossier;
@@ -84,10 +85,10 @@ final class JournalVehicules {
             } else if (t - s.ecrit >= PRESENCE) {
                 e = "p";
             } else {
-                s.manques = 0;
+                s.vu = t;
                 continue;
             }
-            s.manques = 0;
+            s.vu = t;
             s.x = r.x(); s.y = r.y();
             s.signature = r.signature();
             s.ecrit = t;
@@ -104,7 +105,7 @@ final class JournalVehicules {
         for (Iterator<Map.Entry<String, Suivi>> it = suivis.entrySet().iterator(); it.hasNext(); ) {
             Map.Entry<String, Suivi> m = it.next();
             if (presents.contains(m.getKey())) continue;
-            if (++m.getValue().manques < ABSENCE) continue;
+            if (t - m.getValue().vu < ABSENCE) continue;
             // Absent plusieurs lectures de suite : sorti de la zone chargee,
             // ou parti. Le revoir plus tard fera une nouvelle apparition.
             w.write(String.format(Locale.ROOT,

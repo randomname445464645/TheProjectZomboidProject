@@ -4,6 +4,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.joml.Vector3f;
+
 import zombie.GameTime;
 import zombie.characters.IsoGameCharacter;
 import zombie.characters.IsoPlayer;
@@ -155,6 +157,17 @@ final class Vehicules {
         if (d instanceof IsoPlayer p) conducteur = p.getUsername();
         else if (d != null) conducteur = "?";
 
+        // Cap : le vecteur avant du vehicule, dans le repere physique (x, y
+        // vers le haut, z). Verifie en jeu sur la place avant gauche, qui est
+        // devant le centre : son decalage suit (x, -z) dans le repere de la
+        // carte (x vers l'est, y vers le sud).
+        float capX = 0f, capY = 0f;
+        try {
+            Vector3f avant = v.getForwardVector(new Vector3f());
+            capX = fini(avant.x);
+            capY = fini(-avant.z);
+        } catch (Throwable ignore) { }
+
         int etat = poses > 0 ? Math.round((float) somme / poses) : -1;
         boolean toutVerrouille = v.areAllDoorsLocked();
         boolean uneVerrouillee = v.isAnyDoorLocked();
@@ -166,6 +179,7 @@ final class Vehicules {
          .append(",\"n\":").append(Agent.chaine(nom))
          .append(",\"ty\":").append(Agent.chaine(type))
          .append(String.format(Locale.ROOT, ",\"x\":%.1f,\"y\":%.1f,\"z\":%.1f", x, y, z))
+         .append(String.format(Locale.ROOT, ",\"cap\":[%.3f,%.3f]", capX, capY))
          .append(String.format(Locale.ROOT, ",\"c\":[%.3f,%.3f,%.3f]",
                  fini(v.getColorHue()), fini(v.getColorSaturation()), fini(v.getColorValue())))
          .append(",\"skin\":").append(v.getSkinIndex())

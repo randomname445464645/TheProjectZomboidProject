@@ -3,8 +3,8 @@
 Carte web locale du serveur Project Zomboid **PZ together** (build 42.20.4),
 avec 1860 points de loot. Aucune ecriture dans `~/Zomboid`, aucune dependance
 externe, marche hors ligne. Seules lectures cote jeu : ce que l'agent exporte
-dans `~/Zomboid/pz-export`, et `vehicles.db` de la sauvegarde, en lecture seule
-(calque des vehicules).
+dans `~/Zomboid/pz-export`, et les modeles et textures des vehicules (jeu et
+mods), pour leurs icones.
 
 Le rendu des tuiles est fait par [pzmap2dzi](https://github.com/cff29546/pzmap2dzi)
 (inclus ici avec deux correctifs, voir plus bas). Le viewer, lui, est ecrit pour
@@ -71,7 +71,8 @@ quoi qu'il arrive. Restreindre l'emprise ne fait donc pas gagner de temps.
 out/html/carte.html        page
 out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, vehicules.js, app.js
 out/html/serveur.py        serveur statique, bibliotheque standard seule
-out/html/vehicules.py      vehicules : releve en direct, journal agrege, vehicles.db
+out/html/vehicules.py      vehicules : releve en direct, journal agrege
+out/html/icones_vehicules.py  rendu des modeles 3D des vehicules (numpy, Pillow, assimp)
 out/html/icons/            10 sprites extraits de UI2.pack
 out/html/markers.json      1860 marqueurs
 pzmap2dzi/                 l'outil de rendu, avec les correctifs
@@ -195,25 +196,41 @@ portee de l'emetteur qui compte, et au-dela de 90 % le message arrive brouille
 
 ## Vehicules
 
-Onglet Calques, bloc "vehicules" : un carre par vehicule, de sa couleur dans
-le jeu. Un clic ouvre sa fiche : modele, etat, moteur, essence, batterie,
-pneus, cles (dont "tu as la cle"), verrous, contenu, et quand il a ete vu la
-premiere et la derniere fois, en heure reelle et en heure du jeu.
+Onglet Calques, bloc "vehicules" : chaque vehicule vu de dessus, a sa taille
+reelle, tourne selon son cap et peint de sa couleur dans le jeu. Net s'il est
+la maintenant (releve de l'agent chaque seconde, zone chargee autour de toi),
+pali s'il est sorti de ta zone depuis. Ceux qui roulent glissent d'un releve
+a l'autre, et celui que tu conduis suit ta pastille.
 
-| Carre | Source |
-|---|---|
-| plein | la, maintenant : releve de l'agent toutes les 5 s, zone chargee autour de toi |
-| creux | vu par l'agent, sorti de ta zone depuis : position et etat de ce moment-la |
-| pointille gris | `vehicles.db` de la sauvegarde du client : modele et position seulement |
-
+Un clic ouvre sa fiche : apercu de 3/4, modele, etat, moteur, essence,
+batterie, pneus, cles (dont "tu as la cle"), verrous, contenu, et quand il a
+ete vu la premiere et la derniere fois, en heure reelle et en heure du jeu.
 La liste sous les cases donne les plus proches, un clic centre la carte et
-ouvre la fiche. Releve et journal : voir `outils/agent-monde/LISEZMOI.md`,
-section vehicules. Il faut l'agent reconstruit et le jeu relance.
+ouvre la fiche. Releve et journal : `outils/agent-monde/LISEZMOI.md`, section
+vehicules.
 
-Le serveur sert `GET /api/vehicules` (en direct) et
-`GET /api/vehicules?connus=1` (journal agrege et `vehicles.db`), en-tete
-`X-Carte: vehicules`. La sauvegarde lue est la plus recemment jouee de
-`~/Zomboid/Saves/Multiplayer`, ou celle de `PZCARTE_SAUVEGARDE`.
+`vehicles.db`, la base que le client tient dans la sauvegarde, n'est pas lue :
+le jeu ne la met pas a jour en continu et ses positions etaient fausses.
+
+### Les icones
+
+Le jeu n'a pas d'image de ses vehicules, il les dessine en 3D.
+`out/html/icones_vehicules.py` refait ce rendu : il lit le script du vehicule
+(jeu puis mods de l'atelier, avec leurs gabarits), convertit le maillage avec
+`assimp` en appliquant les transformations des noeuds, y ajoute les pieces
+modelisees dans le meme fichier (portieres, capot...), et rasterise vu de
+dessus et de 3/4. La peinture suit le shader du jeu (`vehicle_multiuv.frag`) :
+l'alpha de la texture dit ou la carrosserie est peinte. Comme chaque vehicule
+a sa couleur, le PNG porte la texture et, dessous, la part de peinture et
+l'eclairage ; la carte fait le melange.
+
+Rendu a la demande (1 a 2 s par modele) et garde dans `out/html/vehicules-icones/`.
+Pour tout rendre d'avance : `python3 out/html/icones_vehicules.py --tout`.
+Sans numpy ou Pillow, la carte garde des carres de couleur.
+
+Le serveur sert `GET /api/vehicules` (en direct), `GET /api/vehicules?connus=1`
+(journal agrege) et `GET /api/vehicules/icone?s=<script>&p=<peau>&v=dessus|34`,
+en-tete `X-Carte: vehicules`.
 
 ## Notes
 

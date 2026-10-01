@@ -59,3 +59,6 @@ outils/agent-monde/classes/
 # Captures de la doc amont de pzmap2dzi, 7 Mo de gifs sans rapport avec ce projet.
 pzmap2dzi/docs/img/
 out/html/map_data/itineraire/construction.log
+
+# Icones des vehicules, rendues a la demande par out/html/icones_vehicules.py
+out/html/vehicules-icones/

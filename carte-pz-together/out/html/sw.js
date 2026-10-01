@@ -10,7 +10,7 @@
 // s'ouvrir instantanement et de fonctionner meme si le serveur local n'a pas
 // encore demarre.
 
-const VERSION = 'carte-pz-v7';   // v7 : vehicules
+const VERSION = 'carte-pz-v8';   // v8 : icones des vehicules
 
 // Chemins de la coquille. Les parametres ?v= des balises sont conserves tels
 // quels : c'est l'URL complete qui sert de cle de cache.

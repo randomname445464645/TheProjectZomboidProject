@@ -13,7 +13,10 @@ La carte est statique a deux exceptions pres :
   - GET /api/vehicules renvoie les vehicules que l'agent voit autour du
     joueur (~/Zomboid/pz-export/vehicules.json), et
     GET /api/vehicules?connus=1 tous ceux qu'il a deja vus, tires de son
-    journal, plus ceux de vehicles.db. Lecture seule, voir vehicules.py.
+    journal. Lecture seule, voir vehicules.py.
+  - GET /api/vehicules/icone?s=Base.CarNormal&p=0&v=dessus renvoie l'icone
+    rendue du modele 3D (v = dessus ou 34), en cache dans vehicules-icones/.
+    Voir icones_vehicules.py.
 
 Rien d'autre n'a besoin de flask ni de waitress, la bibliotheque standard
 suffit.
@@ -213,6 +216,28 @@ class Handler(SimpleHTTPRequestHandler):
             q = parse_qs(urlsplit(self.path).query)
             jour = (q.get('jour') or [None])[0]
             self.repondre_json(*(lire_jour(jour) if jour else lister_jours()))
+            return
+        if self.path.split('?', 1)[0] == '/api/vehicules/icone':
+            if self.headers.get('X-Carte') != 'vehicules':
+                self.send_error(403, 'en-tete X-Carte manquant')
+                return
+            from urllib.parse import parse_qs, urlsplit
+            q = parse_qs(urlsplit(self.path).query)
+            chemin, info = vehicules.icone((q.get('s') or [''])[0], (q.get('p') or ['0'])[0],
+                                           (q.get('v') or ['dessus'])[0])
+            if not chemin:
+                self.repondre_json(404, {'ok': False, 'erreur': info})
+                return
+            with open(chemin, 'rb') as f:
+                corps = f.read()
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/png')
+            self.send_header('Content-Length', str(len(corps)))
+            self.send_header('X-Longueur', str(info.get('longueur', '')))
+            self.send_header('X-Largeur', str(info.get('largeur', '')))
+            self.send_header('X-Peaux', str(info.get('peaux', '')))
+            self.end_headers()
+            self.wfile.write(corps)
             return
         if self.path.split('?', 1)[0] == '/api/vehicules':
             if self.headers.get('X-Carte') != 'vehicules':
