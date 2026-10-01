@@ -89,6 +89,9 @@ const HORS_LECTURES = 2;
 const ATTENTE_RECALCUL = 5000; // ms
 const ETAPE_ATTEINTE = 16;    // cases
 let horsDepuis = 0, dernierRecalcul = 0, dernierePos = null;
+// Derniere position recue EN DIRECT, sinon null. Sert de depart par defaut :
+// une position perimee (jeu ferme) ne doit pas devenir le depart en silence.
+let posDirecte = null;
 
 let rappelExterne = () => {};
 
@@ -591,7 +594,10 @@ export function ajouterEtape(x, y) {
     auChangement();
     return;
   }
-  if (etat.attenteDepart) {
+  if (!etat.etapes.length && !etat.attenteDepart && posDirecte) {
+    // Premier clic avec le jeu lance : c'est l'arrivee, le depart est toi.
+    etat.etapes.push({ x: Math.round(posDirecte.x), y: Math.round(posDirecte.y) }, p);
+  } else if (etat.attenteDepart) {
     etat.etapes.unshift(p);
     etat.attenteDepart = false;
     etat.pose = false;
@@ -609,6 +615,22 @@ export function attendreDepart(arrivee) {
   etat.pose = true;
   if (etat.mode === 'route') etat.mode = 'auto';
   recalculer();
+}
+
+/** Ta position en direct, ou null si le jeu n'envoie rien de frais. */
+export function positionDirecte() { return posDirecte ? { ...posDirecte } : null; }
+
+/**
+ * Remplace le depart par ta position en direct. Avec une seule etape, celle-ci
+ * devient l'arrivee. Sans position en direct, ne fait rien.
+ */
+export function partirDeMoi() {
+  if (!posDirecte) return false;
+  const moi = { x: Math.round(posDirecte.x), y: Math.round(posDirecte.y) };
+  const suite = etat.etapes.length > 1 ? etat.etapes.slice(1) : etat.etapes.slice();
+  etat.attenteDepart = false;
+  definirEtapes([moi, ...suite]);
+  return true;
 }
 
 export function retirerEtape(i) {
@@ -679,6 +701,7 @@ function distTrace(p) {
  */
 export function suivrePosition(p, direct) {
   if (p) dernierePos = { x: p.x, y: p.y };
+  posDirecte = direct && p ? { x: p.x, y: p.y } : null;
   if (!etat.guidage || !direct || !p || etat.mode !== 'auto') return;
   if (etat.calculEnCours || !etat.trace || etat.trace.length < 2) return;
   const n = etat.etapes.length;
