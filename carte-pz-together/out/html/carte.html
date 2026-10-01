@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#14161a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="pwa/icone-192.png">
-<link rel="stylesheet" href="carte/style.css?v=26">
+<link rel="stylesheet" href="carte/style.css?v=27">
 </head>
 <body>
 
@@ -111,18 +111,42 @@
     <section class="sous-volet" data-sous-volet="trajet" hidden>
       <div class="bloc">
         <div class="ligne-boutons" style="margin-top:0">
-          <button data-trajet="auto" class="principal" title="Poser des etapes ; le trajet suit les routes">auto</button>
-          <button data-trajet="manuel" title="Poser des etapes ; elles se relient en ligne droite">manuel</button>
-          <button data-trajet="off" title="Les clics sur la carte n'ajoutent plus d'etape. Le trajet reste affiche.">fini</button>
+          <button data-trajet="auto" class="principal" title="Poser des etapes ; le trajet suit les routes">GPS</button>
+          <button data-trajet="manuel" title="Poser des etapes ; elles se relient en ligne droite">ligne droite</button>
+          <button data-trajet="route" title="Dessiner une route que la carte ne connait pas ; le GPS pourra l'emprunter">dessiner une route</button>
+          <button data-trajet="off" title="Les clics sur la carte n'ajoutent plus rien. Le trajet reste affiche.">fini</button>
         </div>
         <p class="aide" id="aideTrajet"></p>
-        <div class="ligne-boutons">
+        <div class="ligne-boutons" id="boutonsEtapes">
           <button id="trajetVider">vider</button>
           <button id="trajetInverser">inverser</button>
           <button id="trajetCadrer">cadrer</button>
         </div>
+        <div id="boutonsBrouillon" class="ligne-boutons" hidden>
+          <input type="text" id="nomRoute" placeholder="nom de la route" maxlength="40">
+          <button id="routeEnregistrer" class="principal">enregistrer</button>
+          <button id="routeRetour">retirer le dernier point</button>
+          <button id="routeAbandon">abandonner</button>
+        </div>
+        <label class="case-calque" id="ligneGuidage" title="Suit ta position en direct ; si tu t'ecartes du trace de plus de 24 cases, l'itineraire est recalcule depuis toi vers les etapes restantes.">
+          <input type="checkbox" id="guidage"> guidage : recalculer si je loupe une sortie
+        </label>
+        <p class="aide" id="etatGuidage"></p>
         <div id="resumeTrajet" class="resume"></div>
       </div>
+      <details class="bloc" id="blocVilles">
+        <summary>Villes a eviter <span id="nbEvitees" class="nb"></span></summary>
+        <p class="aide">Une ville evitee n'est pas interdite : ses routes comptent quinze fois plus long, le GPS n'y passe que s'il n'a pas le choix.</p>
+        <div class="ligne-boutons">
+          <button id="evitToutes">toutes</button>
+          <button id="evitAucune">aucune</button>
+        </div>
+        <div id="listeVilles"></div>
+      </details>
+      <details class="bloc" id="blocRoutes">
+        <summary>Mes routes dessinees <span id="nbRoutes" class="nb"></span></summary>
+        <div id="listeRoutes"></div>
+      </details>
       <div id="listeEtapes"></div>
     </section>
 
@@ -317,6 +341,6 @@
   </section>
 </div>
 
-<script type="module" src="carte/app.js?v=48"></script>
+<script type="module" src="carte/app.js?v=49"></script>
 </body>
 </html>
