@@ -1079,20 +1079,23 @@ function partirDe(p) {
 }
 
 function allerVers(p) {
-  const debut = trajet.etat.etapes.length ? [trajet.etat.etapes[0]] : [];
+  const moi = trajet.positionDirecte();
+  const debut = trajet.etat.etapes.length ? [trajet.etat.etapes[0]] : moi ? [moi] : [];
   trajet.definirEtapes([...debut, { x: p.x, y: p.y }]);
   allerOnglet('trajet');
 }
 
 /**
- * "trajet jusqu'ici" depuis une pastille. Le depart est la base
- * selectionnee, a defaut la premiere base posee, a defaut le depart deja
- * present. Sans aucun des trois, on pose l'arrivee et on demande le depart.
+ * "trajet jusqu'ici" depuis une pastille. Le depart est ta position en
+ * direct si le jeu tourne, sinon la base selectionnee, a defaut la premiere
+ * base posee, a defaut le depart deja present. Sans aucun, on pose l'arrivee
+ * et on demande le depart.
  */
 function trajetVers(m) {
   const base = bases.trouver(bases.etat.selection) || bases.etat.liste[0] || null;
-  const depart = base ? { x: base.x, y: base.y }
-    : (trajet.etat.etapes[0] || null);
+  const depart = trajet.positionDirecte()
+    || (base ? { x: base.x, y: base.y } : null)
+    || trajet.etat.etapes[0] || null;
   if (depart) {
     trajet.definirEtapes([depart, { x: m.x, y: m.y }]);
   } else {
@@ -1117,6 +1120,7 @@ function initTrajetPanneau() {
     });
   }
   $('trajetVider').addEventListener('click', () => trajet.vider());
+  $('trajetDepuisMoi').addEventListener('click', () => trajet.partirDeMoi());
   $('routeEnregistrer').addEventListener('click', () => {
     if (trajet.enregistrerBrouillon($('nomRoute').value)) $('nomRoute').value = '';
   });
@@ -1152,6 +1156,7 @@ function majPanneauTrajet() {
     ? (enRoute ? 'Chaque clic ajoute un point a la route. Echap pour arreter.'
       : 'Chaque clic sur la carte ajoute une etape. Echap pour arreter.')
     : 'Choisis GPS ou ligne droite pour poser des etapes sur la carte. '
+      + 'Jeu lance, le depart est ta position en direct et ton premier clic devient l\'arrivee. '
       + 'Depuis l\'onglet Bases, "depart" et "arrivee" remplissent le trajet.';
   $('aideTrajet').textContent = pose + ' ' + (t.mode === 'auto'
     ? "GPS : le trajet ne roule que sur les cases de chaussee lues dans les tuiles du jeu (bitume, gravier, chemins de terre), a 4 cases pres. Une etape posee hors route rejoint la plus proche a pied, en pointilles."
@@ -1160,6 +1165,7 @@ function majPanneauTrajet() {
       : 'Ligne droite : les etapes se relient sans tenir compte du terrain.');
   $('boutonsBrouillon').hidden = !enRoute;
   $('boutonsEtapes').hidden = enRoute;
+  $('trajetDepuisMoi').disabled = !trajet.positionDirecte();
   $('routeEnregistrer').disabled = t.brouillon.length < 2;
   $('routeRetour').disabled = !t.brouillon.length;
   majVillesEtRoutes();
@@ -1314,6 +1320,7 @@ function dureeTexte(s) {
 
 function majJoueurUI() {
   trajet.suivrePosition(joueur.positionMoi(), joueur.enDirect());
+  $('trajetDepuisMoi').disabled = !trajet.positionDirecte();
   const b = $('suivre');
   // Le bouton n'apparait que si une position existe : sans agent dans le jeu,
   // il n'y a personne a suivre.
