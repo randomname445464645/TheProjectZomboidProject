@@ -27,6 +27,9 @@ import os
 import re
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from plafond import plafonner  # noqa: E402
+
 RACINE = os.path.dirname(os.path.abspath(__file__))
 
 # --- feuillage saisonnier ----------------------------------------------------
@@ -236,4 +239,5 @@ def main():
 
 
 if __name__ == "__main__":
+    plafonner()
     sys.exit(main())

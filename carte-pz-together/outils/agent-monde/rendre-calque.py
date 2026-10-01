@@ -27,6 +27,9 @@ import sys
 import time
 from multiprocessing import Pool
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from plafond import plafonner  # noqa: E402
+
 from PIL import Image
 
 RACINE = os.path.dirname(os.path.abspath(__file__))
@@ -189,7 +192,10 @@ def main():
     faits = 0
     t0 = time.time()
     # px0/py0 passes aux ouvriers : ils raisonnent en coordonnees de pyramide.
-    with Pool(8, initializer=init,
+    # Chaque processus recoit sa copie de toutes les cases : 8 ouvriers
+    # suffisaient a remplir 32 Gio. 2 par defaut, PZ_OUVRIERS pour changer.
+    ouvriers = max(1, int(os.environ.get('PZ_OUVRIERS', 2)))
+    with Pool(ouvriers, initializer=init,
               initargs=(noms, metas, cases, px0, py0, TUILE, NIVEAU_MAX)) as p:
         for r in p.imap_unordered(rendre_tuile, travaux, chunksize=8):
             faits += 1
@@ -247,4 +253,5 @@ def main():
 
 
 if __name__ == '__main__':
+    plafonner()
     sys.exit(main())

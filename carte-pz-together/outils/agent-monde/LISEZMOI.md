@@ -195,6 +195,16 @@ recharge que les tuiles redessinées, grâce au jeton par tuile que le rendu
 
 Repartir de zéro après avoir effacé le relevé : `--reinitialiser`.
 
+### Plafond des anciens scripts
+
+`convertir.py` et `rendre-calque.py` se relancent eux-mêmes dans un cgroup
+plafonné (`plafond.py`) : 8 Gio sans swap par défaut (`PZ_MEMOIRE_MAX=12G`
+pour changer), priorité minimale, score OOM maximal. `rendre-calque.py` prend
+2 processus au lieu de 8 (`PZ_OUVRIERS`), chacun portant une copie de toutes
+les cases. Le 1er octobre 2026, lancés sans limite par l'ancien bouton
+synchroniser, ils ont rempli les 32 Gio et le noyau a tué d'autres
+applications. S'ils dépassent maintenant, ce sont eux qui meurent.
+
 ## Effacer un relevé pour repartir de zéro
 
 **Arrêter le jeu d'abord.** Renommer ou supprimer le fichier pendant que
