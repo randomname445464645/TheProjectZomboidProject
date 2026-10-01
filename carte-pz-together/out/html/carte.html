@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#14161a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="pwa/icone-192.png">
-<link rel="stylesheet" href="carte/style.css?v=24">
+<link rel="stylesheet" href="carte/style.css?v=25">
 </head>
 <body>
 
@@ -39,197 +39,254 @@
 <div id="panneau">
   <h1>Carte PZ together</h1>
 
+  <!-- Quatre grandes categories, chacune decoupee en sous-onglets. Avant, cinq
+       onglets a plat dont un "Calques" fourre-tout : rues, joueurs, vehicules,
+       radio, repop et coordonnees s'y empilaient sur toute la hauteur. -->
   <nav id="onglets">
-    <button data-onglet="lieux" class="actif">Lieux</button>
-    <button data-onglet="bases">Bases</button>
-    <button data-onglet="trajet">Trajet</button>
-    <button data-onglet="traces">Traces</button>
-    <button data-onglet="reglages">Calques</button>
+    <button data-onglet="butin" class="actif">Butin</button>
+    <button data-onglet="deplacements">Deplacements</button>
+    <button data-onglet="joueurs">Joueurs</button>
+    <button data-onglet="carte">Carte</button>
   </nav>
 
-  <!-- LIEUX ------------------------------------------------------------ -->
-  <section class="volet" data-volet="lieux">
-    <div class="bloc">
-      <div id="filtres"></div>
-      <div class="ligne-boutons">
-        <button id="toutCocher">Tout</button>
-        <button id="rienCocher">Rien</button>
-        <button id="voirTout">Tout voir</button>
-        <button id="slugger">Slugger</button>
+  <!-- BUTIN ============================================================ -->
+  <section class="volet" data-volet="butin">
+    <nav class="sous-onglets">
+      <button data-sous="lieux">Lieux</button>
+      <button data-sous="repop">Repop</button>
+    </nav>
+
+    <section class="sous-volet" data-sous-volet="lieux">
+      <div class="bloc">
+        <div id="filtres"></div>
+        <div class="ligne-boutons">
+          <button id="toutCocher">Tout</button>
+          <button id="rienCocher">Rien</button>
+          <button id="voirTout">Tout voir</button>
+          <button id="slugger">Slugger</button>
+        </div>
+        <div class="ligne-boutons">
+          <input type="search" id="recherche" placeholder="chercher un lieu, une piece, un objet...">
+        </div>
+        <div class="ligne-boutons ligne-tri">
+          <label><input type="radio" name="tri" value="distance" checked> au plus pres</label>
+          <label><input type="radio" name="tri" value="nom"> par nom</label>
+          <label><input type="checkbox" id="masquerPilles"> cacher les pilles</label>
+        </div>
       </div>
-      <div class="ligne-boutons">
-        <input type="search" id="recherche" placeholder="chercher un lieu, une piece, un objet...">
+      <div id="liste"></div>
+    </section>
+
+    <section class="sous-volet" data-sous-volet="repop" hidden>
+      <div class="bloc" id="blocLoot">
+        <div class="ligne-loot">
+          <span class="etiquette">repop</span>
+          <input type="text" id="repopJeu" inputmode="decimal" title="Delai de repop, en heures de JEU">
+          <span class="unite">h de jeu</span>
+          <span id="repopReel" class="reel"></span>
+        </div>
+        <div class="ligne-loot">
+          <span id="lootCompte" class="reel"></span>
+          <button id="lootReset" title="Effacer tous les chronos">tout effacer</button>
+        </div>
+        <p class="aide">Marque un lieu pille depuis la liste, ou au clic droit
+          sur sa pastille : il s'eteint jusqu'au repop, puis se souligne de vert.</p>
       </div>
-      <div class="ligne-boutons ligne-tri">
-        <label><input type="radio" name="tri" value="distance" checked> au plus pres</label>
-        <label><input type="radio" name="tri" value="nom"> par nom</label>
-        <label><input type="checkbox" id="masquerPilles"> cacher les pilles</label>
-      </div>
-    </div>
-    <div id="liste"></div>
+    </section>
   </section>
 
-  <!-- BASES ------------------------------------------------------------ -->
-  <section class="volet" data-volet="bases" hidden>
-    <div class="bloc">
-      <div class="ligne-boutons" style="margin-top:0">
-        <button id="poserBase" class="principal">poser une base</button>
-        <button id="baseIci" title="Poser une base au centre de la vue">au centre</button>
+  <!-- DEPLACEMENTS ===================================================== -->
+  <section class="volet" data-volet="deplacements" hidden>
+    <nav class="sous-onglets">
+      <button data-sous="trajet">Trajet</button>
+      <button data-sous="bases">Bases <i class="nb" id="nbBasesOnglet"></i></button>
+      <button data-sous="aller">Aller a</button>
+    </nav>
+
+    <section class="sous-volet" data-sous-volet="trajet" hidden>
+      <div class="bloc">
+        <div class="ligne-boutons" style="margin-top:0">
+          <button data-trajet="auto" class="principal" title="Poser des etapes ; le trajet suit les routes">auto</button>
+          <button data-trajet="manuel" title="Poser des etapes ; elles se relient en ligne droite">manuel</button>
+          <button data-trajet="off" title="Les clics sur la carte n'ajoutent plus d'etape. Le trajet reste affiche.">fini</button>
+        </div>
+        <p class="aide" id="aideTrajet"></p>
+        <div class="ligne-boutons">
+          <button id="trajetVider">vider</button>
+          <button id="trajetInverser">inverser</button>
+          <button id="trajetCadrer">cadrer</button>
+        </div>
+        <div id="resumeTrajet" class="resume"></div>
       </div>
-      <p class="aide">Les bases vivent dans ce navigateur, pas dans le rendu :
-        un nouveau rendu ne les efface pas, et aucun outil ne les ecrase.</p>
-      <div class="ligne-boutons">
-        <button id="exporterBases">exporter</button>
-        <button id="importerBases">importer</button>
-        <span class="reel" id="etatBases"></span>
+      <div id="listeEtapes"></div>
+    </section>
+
+    <section class="sous-volet" data-sous-volet="bases" hidden>
+      <div class="bloc">
+        <div class="ligne-boutons" style="margin-top:0">
+          <button id="poserBase" class="principal">poser une base</button>
+          <button id="baseIci" title="Poser une base au centre de la vue">au centre</button>
+        </div>
+        <p class="aide">Les bases vivent dans ce navigateur, pas dans le rendu :
+          un nouveau rendu ne les efface pas, et aucun outil ne les ecrase.</p>
+        <div class="ligne-boutons">
+          <button id="exporterBases">exporter</button>
+          <button id="importerBases">importer</button>
+          <span class="reel" id="etatBases"></span>
+        </div>
       </div>
-    </div>
-    <div id="listeBases"></div>
+      <div id="listeBases"></div>
+    </section>
+
+    <section class="sous-volet" data-sous-volet="aller" hidden>
+      <div class="bloc">
+        <div class="ligne-boutons" style="margin-top:0">
+          <input type="text" id="coordX" placeholder="x" inputmode="numeric">
+          <input type="text" id="coordY" placeholder="y" inputmode="numeric">
+          <button id="allerCoord">Aller</button>
+        </div>
+        <div class="ligne-boutons">
+          <select id="villes"><option value="">aller a une ville moddee...</option></select>
+        </div>
+        <p class="aide">Astuce : clic droit sur la carte, "copier les
+          coordonnees", pour les recoller ici ou dans le chat du jeu.</p>
+      </div>
+    </section>
   </section>
 
-  <!-- TRAJET ----------------------------------------------------------- -->
-  <section class="volet" data-volet="trajet" hidden>
-    <div class="bloc">
-      <div class="ligne-boutons" style="margin-top:0">
-        <button data-trajet="auto" class="principal" title="Poser des etapes ; le trajet suit les routes">auto</button>
-        <button data-trajet="manuel" title="Poser des etapes ; elles se relient en ligne droite">manuel</button>
-        <button data-trajet="off" title="Les clics sur la carte n'ajoutent plus d'etape. Le trajet reste affiche.">fini</button>
+  <!-- JOUEURS ========================================================== -->
+  <section class="volet" data-volet="joueurs" hidden>
+    <nav class="sous-onglets">
+      <button data-sous="direct">En direct</button>
+      <button data-sous="vehicules">Vehicules <i class="nb" id="nbVehiculesOnglet"></i></button>
+      <button data-sous="traces">Traces</button>
+    </nav>
+
+    <section class="sous-volet" data-sous-volet="direct" hidden>
+      <div class="bloc">
+        <label class="case-calque" style="margin-top:0">
+          <input type="checkbox" id="calqueJoueur" checked> ma position en direct
+        </label>
+        <div class="aide" id="etatJoueur"></div>
+        <!-- Repliable : un serveur plein, c'est des dizaines de lignes. -->
+        <details id="blocJoueurs" hidden open>
+          <summary id="resumeJoueurs">autres joueurs</summary>
+          <div id="listeJoueurs"></div>
+        </details>
       </div>
-      <p class="aide" id="aideTrajet"></p>
-      <div class="ligne-boutons">
-        <button id="trajetVider">vider</button>
-        <button id="trajetInverser">inverser</button>
-        <button id="trajetCadrer">cadrer</button>
+    </section>
+
+    <section class="sous-volet" data-sous-volet="vehicules" hidden>
+      <div class="bloc" id="blocVehicules">
+        <label class="case-calque" style="margin-top:0">
+          <input type="checkbox" id="calqueVehicules" checked> vehicules autour de moi
+          <i class="nb" id="nbVehicules"></i>
+        </label>
+        <label class="case-calque">
+          <input type="checkbox" id="calqueVehiculesVus" checked> vehicules deja vus
+          <i class="nb" id="nbVehiculesVus"></i>
+        </label>
+        <div class="aide" id="etatVehicules"></div>
+        <div id="listeVehicules"></div>
       </div>
-      <div id="resumeTrajet" class="resume"></div>
-    </div>
-    <div id="listeEtapes"></div>
+    </section>
+
+    <section class="sous-volet" data-sous-volet="traces" hidden>
+      <div class="bloc">
+        <div class="ligne-boutons" style="margin-top:0">
+          <select id="traceJour"><option value="">chargement...</option></select>
+          <button id="traceRafraichir" title="Relire la liste des jours">&#8635;</button>
+        </div>
+        <div id="traceJoueurs"></div>
+        <div class="ligne-plage">
+          <span>de</span><input type="range" id="traceDebut" min="0" max="1000" value="0">
+          <b id="traceDebutTxt"></b>
+        </div>
+        <div class="ligne-plage">
+          <span>a</span><input type="range" id="traceFin" min="0" max="1000" value="1000">
+          <b id="traceFinTxt"></b>
+        </div>
+        <div class="ligne-boutons">
+          <button id="traceCadrer">cadrer</button>
+          <button id="traceLire" class="principal">rejouer</button>
+          <select id="traceVitesse" title="Vitesse de relecture">
+            <option value="30">x30</option>
+            <option value="120" selected>x120</option>
+            <option value="600">x600</option>
+          </select>
+          <button id="traceArreter">arreter</button>
+        </div>
+        <label class="case-calque">
+          <input type="checkbox" id="traceEpingler"> garder a l'ecran hors de cet onglet
+        </label>
+        <p class="aide" id="traceAide"></p>
+      </div>
+      <div id="traceStats"></div>
+    </section>
   </section>
 
-  <!-- TRACES ----------------------------------------------------------- -->
-  <section class="volet" data-volet="traces" hidden>
-    <div class="bloc">
-      <div class="ligne-boutons" style="margin-top:0">
-        <select id="traceJour"><option value="">chargement...</option></select>
-        <button id="traceRafraichir" title="Relire la liste des jours">&#8635;</button>
-      </div>
-      <div id="traceJoueurs"></div>
-      <div class="ligne-plage">
-        <span>de</span><input type="range" id="traceDebut" min="0" max="1000" value="0">
-        <b id="traceDebutTxt"></b>
-      </div>
-      <div class="ligne-plage">
-        <span>a</span><input type="range" id="traceFin" min="0" max="1000" value="1000">
-        <b id="traceFinTxt"></b>
-      </div>
-      <div class="ligne-boutons">
-        <button id="traceCadrer">cadrer</button>
-        <button id="traceLire" class="principal">rejouer</button>
-        <select id="traceVitesse" title="Vitesse de relecture">
-          <option value="30">x30</option>
-          <option value="120" selected>x120</option>
-          <option value="600">x600</option>
-        </select>
-        <button id="traceArreter">arreter</button>
-      </div>
-      <label class="case-calque">
-        <input type="checkbox" id="traceEpingler"> garder a l'ecran hors de cet onglet
-      </label>
-      <p class="aide" id="traceAide"></p>
-    </div>
-    <div id="traceStats"></div>
-  </section>
+  <!-- CARTE ============================================================ -->
+  <section class="volet" data-volet="carte" hidden>
+    <nav class="sous-onglets">
+      <button data-sous="calques">Calques</button>
+      <button data-sous="radio">Radio</button>
+      <button data-sous="export">Export</button>
+    </nav>
 
-  <!-- CALQUES ---------------------------------------------------------- -->
-  <section class="volet" data-volet="reglages" hidden>
-    <div class="bloc">
-      <label class="case-calque">
-        <input type="checkbox" id="calqueRues"> noms de rues
-      </label>
-      <label class="case-calque" id="labelConstructions" hidden>
-        <input type="checkbox" id="calqueConstructions"> mes constructions
-        <i class="nb" id="nbConstructions"></i>
-      </label>
-      <!-- Le bouton de rendu est colle a sa case : place sous la liste des
-           joueurs, il disparaissait des qu'il y avait du monde sur le serveur. -->
-      <div class="ligne-sync" id="ligneSync" hidden>
-        <button id="syncConstructions" class="principal" title="Relit ce que l'agent a releve en jeu et recalcule les tuiles du calque. Environ 15 min.">rendre mes constructions</button>
-        <span class="reel" id="etatSync"></span>
+    <section class="sous-volet" data-sous-volet="calques" hidden>
+      <div class="bloc">
+        <label class="case-calque" style="margin-top:0">
+          <input type="checkbox" id="calqueRues"> noms de rues
+        </label>
+        <label class="case-calque">
+          <input type="checkbox" id="calqueBases" checked> mes bases
+          <i class="nb" id="nbBases"></i>
+        </label>
+        <label class="case-calque" id="labelConstructions" hidden>
+          <input type="checkbox" id="calqueConstructions"> mes constructions
+          <i class="nb" id="nbConstructions"></i>
+        </label>
+        <!-- Le bouton de rendu est colle a sa case. -->
+        <div class="ligne-sync" id="ligneSync" hidden>
+          <button id="syncConstructions" class="principal" title="Relit ce que l'agent a releve en jeu et recalcule les tuiles du calque. Environ 15 min.">rendre mes constructions</button>
+          <span class="reel" id="etatSync"></span>
+        </div>
+        <p class="aide">Ta position, les vehicules et les traces se reglent
+          dans l'onglet Joueurs ; la portee des talkies dans Radio.</p>
       </div>
-      <label class="case-calque">
-        <input type="checkbox" id="calqueBases" checked> mes bases
-        <i class="nb" id="nbBases"></i>
-      </label>
-      <label class="case-calque">
-        <input type="checkbox" id="calqueJoueur" checked> ma position en direct
-      </label>
-      <div class="aide" id="etatJoueur"></div>
-      <div class="ligne-sync">
-        <button id="exportHD" title="Enregistrer la vue courante en PNG, a la resolution native des tuiles">exporter en HD</button>
-        <span class="reel" id="etatExport"></span>
-      </div>
-      <!-- Repliable, et en dernier : un serveur plein, c'est des dizaines de
-           lignes. -->
-      <details id="blocJoueurs" hidden>
-        <summary id="resumeJoueurs">autres joueurs</summary>
-        <div id="listeJoueurs"></div>
-      </details>
-    </div>
+    </section>
 
-    <div class="bloc" id="blocVehicules">
-      <label class="case-calque" style="margin-top:0">
-        <input type="checkbox" id="calqueVehicules" checked> vehicules autour de moi
-        <i class="nb" id="nbVehicules"></i>
-      </label>
-      <label class="case-calque">
-        <input type="checkbox" id="calqueVehiculesVus" checked> vehicules deja vus
-        <i class="nb" id="nbVehiculesVus"></i>
-      </label>
-      <div class="aide" id="etatVehicules"></div>
-      <div id="listeVehicules"></div>
-    </div>
+    <section class="sous-volet" data-sous-volet="radio" hidden>
+      <div class="bloc" id="blocRadio">
+        <label class="case-calque" style="margin-top:0">
+          <input type="checkbox" id="calqueRadio"> portee des talkies-walkies
+        </label>
+        <div class="ligne-boutons">
+          <select id="radioCentre" title="Centre des cercles"></select>
+          <button id="radioEpingler" title="Epingler le centre des cercles au milieu de la vue">epingler ici</button>
+          <button id="radioCadrer" title="Cadrer sur le plus grand cercle">cadrer</button>
+        </div>
+        <div id="radioModeles"></div>
+        <p class="aide">Portees du jeu (TransmitRange). C'est la portee de
+          l'emetteur : l'autre t'entend s'il est dans TON cercle. Au-dela du
+          pointille (90 %), le message arrive brouille. Clic droit sur la
+          carte pour centrer les cercles sur un point precis.</p>
+      </div>
+    </section>
 
-    <div class="bloc" id="blocRadio">
-      <label class="case-calque" style="margin-top:0">
-        <input type="checkbox" id="calqueRadio"> portee des talkies-walkies
-      </label>
-      <div class="ligne-boutons">
-        <select id="radioCentre" title="Centre des cercles"></select>
-        <button id="radioEpingler" title="Epingler le centre des cercles au milieu de la vue">epingler ici</button>
-        <button id="radioCadrer" title="Cadrer sur le plus grand cercle">cadrer</button>
+    <section class="sous-volet" data-sous-volet="export" hidden>
+      <div class="bloc">
+        <div class="ligne-sync" style="margin-top:0">
+          <button id="exportHD" title="Enregistrer la vue courante en PNG, a la resolution native des tuiles">exporter en HD</button>
+          <span class="reel" id="etatExport"></span>
+        </div>
+        <p class="aide">Enregistre la vue courante en PNG, a la resolution
+          native des tuiles.</p>
       </div>
-      <div id="radioModeles"></div>
-      <p class="aide">Portees du jeu (TransmitRange). C'est la portee de
-        l'emetteur : l'autre t'entend s'il est dans TON cercle. Au-dela du
-        pointille (90 %), le message arrive brouille.</p>
-    </div>
-
-    <div class="bloc" id="blocLoot">
-      <div class="ligne-loot">
-        <span class="etiquette">repop</span>
-        <input type="text" id="repopJeu" inputmode="decimal" title="Delai de repop, en heures de JEU">
-        <span class="unite">h de jeu</span>
-        <span id="repopReel" class="reel"></span>
-      </div>
-      <div class="ligne-loot">
-        <span id="lootCompte" class="reel"></span>
-        <button id="lootReset" title="Effacer tous les chronos">tout effacer</button>
-      </div>
-    </div>
-
-    <div class="bloc">
-      <div class="ligne-boutons" style="margin-top:0">
-        <input type="text" id="coordX" placeholder="x" inputmode="numeric">
-        <input type="text" id="coordY" placeholder="y" inputmode="numeric">
-        <button id="allerCoord">Aller</button>
-      </div>
-      <div class="ligne-boutons">
-        <select id="villes"><option value="">aller a une ville moddee...</option></select>
-      </div>
-    </div>
+    </section>
   </section>
 </div>
 
-<script type="module" src="carte/app.js?v=46"></script>
+<script type="module" src="carte/app.js?v=47"></script>
 </body>
 </html>

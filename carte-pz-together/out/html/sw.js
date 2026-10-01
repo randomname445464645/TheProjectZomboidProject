@@ -10,7 +10,7 @@
 // s'ouvrir instantanement et de fonctionner meme si le serveur local n'a pas
 // encore demarre.
 
-const VERSION = 'carte-pz-v8';   // v8 : icones des vehicules
+const VERSION = 'carte-pz-v9';   // v9 : sous-onglets, menu du clic droit
 
 // Chemins de la coquille. Les parametres ?v= des balises sont conserves tels
 // quels : c'est l'URL complete qui sert de cle de cache.
@@ -27,6 +27,7 @@ const COQUILLE = [
   '/carte/loot.js',
   '/carte/loot-table.js',
   '/carte/exporter.js',
+  '/carte/menu.js',
   '/carte/constructions.js',
   '/carte/bases.js',
   '/carte/itineraire.js',

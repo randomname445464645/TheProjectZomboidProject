@@ -22,6 +22,7 @@ import * as radio from './radio.js';
 import * as vehicules from './vehicules.js';
 import * as loot from './loot.js';
 import { exporterVue } from './exporter.js';
+import * as menu from './menu.js';
 import { initConstructions, basculerConstructions, dessinerConstructions,
          disponible as constructionsDisponibles,
          nombreCases as nbConstructions,
@@ -106,35 +107,89 @@ function majHud() {
 
 // --- panneau des filtres ---------------------------------------------------
 
+// Les onze categories sont rangees en trois familles. A plat sur deux
+// colonnes, il fallait lire toutes les etiquettes pour retrouver la bonne ;
+// la case de famille coche ou decoche ses categories d'un coup.
+const FAMILLES = [
+  { nom: 'Valeurs',     cles: ['top', 'or', 'billets', 'valeur'] },
+  { nom: 'Equipement',  cles: ['armes', 'outils', 'metal'] },
+  { nom: 'Survie',      cles: ['medical', 'bouffe', 'essence', 'labo'] },
+];
+
+function famillesCompletes() {
+  // Une categorie ajoutee plus tard sans famille ne doit pas disparaitre.
+  const rangees = new Set(FAMILLES.flatMap(f => f.cles));
+  const orphelines = CATEGORIES.filter(c => !rangees.has(c.cle)).map(c => c.cle);
+  return orphelines.length ? [...FAMILLES, { nom: 'Autres', cles: orphelines }] : FAMILLES;
+}
+
 function construireFiltres() {
   const hote = $('filtres');
   hote.innerHTML = '';
-  for (const c of CATEGORIES) {
-    const l = document.createElement('label');
-    l.innerHTML =
-      `<input type="checkbox" data-cat="${c.cle}" ${etat.filtres[c.cle] ? 'checked' : ''}>`
-      + `<b class="pastille" style="background:${c.couleur};`
-      + `background-image:url(icons/${c.cle}.png?v=4)"></b>`
-      + `<span class="nom">${c.nom}</span>`
-      + `<i class="nb">${etat.compteurs[c.cle] || 0}</i>`;
-    hote.appendChild(l);
+  const parCle = new Map(CATEGORIES.map(c => [c.cle, c]));
+  for (const f of famillesCompletes()) {
+    const cats = f.cles.map(k => parCle.get(k)).filter(Boolean);
+    if (!cats.length) continue;
+    const groupe = document.createElement('div');
+    groupe.className = 'famille';
+    const tete = document.createElement('label');
+    tete.className = 'tete-famille';
+    const total = cats.reduce((n, c) => n + (etat.compteurs[c.cle] || 0), 0);
+    tete.innerHTML = `<input type="checkbox" data-famille><span class="nom"></span><i class="nb">${total}</i>`;
+    tete.querySelector('.nom').textContent = f.nom;
+    groupe.appendChild(tete);
+    const corps = document.createElement('div');
+    corps.className = 'cats';
+    for (const c of cats) {
+      const l = document.createElement('label');
+      l.innerHTML =
+        `<input type="checkbox" data-cat="${c.cle}" ${etat.filtres[c.cle] ? 'checked' : ''}>`
+        + `<b class="pastille" style="background:${c.couleur};`
+        + `background-image:url(icons/${c.cle}.png?v=4)"></b>`
+        + `<span class="nom">${c.nom}</span>`
+        + `<i class="nb">${etat.compteurs[c.cle] || 0}</i>`;
+      corps.appendChild(l);
+    }
+    groupe.appendChild(corps);
+    const caseFamille = tete.querySelector('[data-famille]');
+    caseFamille.addEventListener('change', () => {
+      for (const c of cats) etat.filtres[c.cle] = caseFamille.checked;
+      appliquerFiltres();
+    });
+    hote.appendChild(groupe);
   }
   hote.querySelectorAll('[data-cat]').forEach(cb => {
     cb.addEventListener('change', () => {
       etat.filtres[cb.dataset.cat] = cb.checked;
-      enregistrerFiltres();
-      reinitialiserAffichage();
-      demanderRendu(true);
+      appliquerFiltres();
     });
   });
+  majCasesFiltres();
+}
+
+/** Remet les cases d'accord avec etat.filtres, familles comprises. */
+function majCasesFiltres() {
+  const hote = $('filtres');
+  hote.querySelectorAll('[data-cat]').forEach(cb => { cb.checked = !!etat.filtres[cb.dataset.cat]; });
+  for (const g of hote.querySelectorAll('.famille')) {
+    const cases = [...g.querySelectorAll('[data-cat]')];
+    const n = cases.filter(cb => cb.checked).length;
+    const cf = g.querySelector('[data-famille]');
+    cf.checked = n === cases.length;
+    cf.indeterminate = n > 0 && n < cases.length;
+  }
+}
+
+function appliquerFiltres() {
+  majCasesFiltres();
+  enregistrerFiltres();
+  reinitialiserAffichage();
+  demanderRendu(true);
 }
 
 function toutCocher(valeur) {
   for (const c of CATEGORIES) etat.filtres[c.cle] = valeur;
-  document.querySelectorAll('#filtres [data-cat]').forEach(cb => { cb.checked = valeur; });
-  enregistrerFiltres();
-  reinitialiserAffichage();
-  demanderRendu(true);
+  appliquerFiltres();
 }
 
 // --- liste laterale --------------------------------------------------------
@@ -714,14 +769,40 @@ function restaurerVue() {
 
 // --- onglets du panneau ----------------------------------------------------
 
+// Deux niveaux : quatre grandes categories, chacune avec ses sous-onglets.
+// Le reste du code ne parle que de sous-onglets ('bases', 'trajet'...) :
+// allerOnglet('bases') ouvre aussi sa categorie.
+let sousActif = 'lieux';
+
 function initOnglets() {
   const boutons = [...document.querySelectorAll('#onglets button')];
+  const parent = new Map();            // sous-onglet -> categorie
+  const dernier = {};                  // categorie -> dernier sous-onglet vu
+  for (const v of document.querySelectorAll('.volet')) {
+    const sous = [...v.querySelectorAll('[data-sous-volet]')].map(s => s.dataset.sousVolet);
+    for (const s of sous) parent.set(s, v.dataset.volet);
+    dernier[v.dataset.volet] = sous[0];
+  }
+  try { Object.assign(dernier, JSON.parse(localStorage.getItem('pzcarte.sousOnglets') || '{}')); } catch (e) {}
+
   const montrer = (nom) => {
-    for (const b of boutons) b.classList.toggle('actif', b.dataset.onglet === nom);
-    for (const v of document.querySelectorAll('.volet')) {
-      v.hidden = v.dataset.volet !== nom;
+    // On accepte une categorie (on rouvre son dernier sous-onglet) ou un
+    // sous-onglet. Les anciens noms enregistres retombent sur leurs pieds.
+    if (nom === 'reglages') nom = 'calques';
+    if (!parent.has(nom)) nom = dernier[nom] && parent.has(dernier[nom]) ? dernier[nom] : 'lieux';
+    const cat = parent.get(nom);
+    sousActif = nom;
+    dernier[cat] = nom;
+    for (const b of boutons) b.classList.toggle('actif', b.dataset.onglet === cat);
+    for (const v of document.querySelectorAll('.volet')) v.hidden = v.dataset.volet !== cat;
+    for (const b of document.querySelectorAll('.sous-onglets button')) {
+      b.classList.toggle('actif', b.dataset.sous === nom);
     }
-    try { localStorage.setItem('pzcarte.onglet', nom); } catch (e) {}
+    for (const s of document.querySelectorAll('.sous-volet')) s.hidden = s.dataset.sousVolet !== nom;
+    try {
+      localStorage.setItem('pzcarte.onglet', nom);
+      localStorage.setItem('pzcarte.sousOnglets', JSON.stringify(dernier));
+    } catch (e) {}
     if (nom === 'lieux') majListe();
     if (nom === 'bases') majPanneauBases();
     if (nom === 'trajet') majPanneauTrajet();
@@ -731,9 +812,11 @@ function initOnglets() {
     if (nom === 'traces') ouvrirTraces();
   };
   for (const b of boutons) b.addEventListener('click', () => montrer(b.dataset.onglet));
+  for (const b of document.querySelectorAll('.sous-onglets button')) {
+    b.addEventListener('click', () => montrer(b.dataset.sous));
+  }
   let voulu = 'lieux';
   try { voulu = localStorage.getItem('pzcarte.onglet') || 'lieux'; } catch (e) {}
-  if (!boutons.some(b => b.dataset.onglet === voulu)) voulu = 'lieux';
   montrer(voulu);
   return montrer;
 }
@@ -785,6 +868,7 @@ function majPanneauBases() {
   const hote = $('listeBases');
   hote.textContent = '';
   $('nbBases').textContent = bases.etat.liste.length + (bases.etat.liste.length > 1 ? ' bases' : ' base');
+  $('nbBasesOnglet').textContent = bases.etat.liste.length || '';
   $('poserBase').classList.toggle('actif', bases.etat.pose);
   if (!bases.etat.liste.length) {
     const p = document.createElement('p');
@@ -1293,8 +1377,7 @@ function initTracesPanneau() {
   $('traceEpingler').checked = epingle;
   $('traceEpingler').addEventListener('change', function () {
     try { localStorage.setItem('pzcarte.traces.epingle', this.checked ? '1' : '0'); } catch (e) {}
-    const actif = document.querySelector('#onglets button.actif');
-    histo.afficher(this.checked || (actif && actif.dataset.onglet === 'traces'));
+    histo.afficher(this.checked || sousActif === 'traces');
     if (this.checked) ouvrirTraces();
   });
   // Epinglees depuis une session precedente : on charge tout de suite, quel
@@ -1396,6 +1479,7 @@ function majVehiculesUI() {
   const n = vehicules.nombres();
   $('nbVehicules').textContent = n.presents ? String(n.presents) : '';
   $('nbVehiculesVus').textContent = n.vus ? String(n.vus) : '';
+  $('nbVehiculesOnglet').textContent = vehicules.etat.actif && n.presents ? String(n.presents) : '';
   $('etatVehicules').textContent = vehicules.texteEtat();
 
   // Les plus proches, pour retrouver une voiture sans chercher le carre.
@@ -1453,6 +1537,148 @@ function clicCarte(e) {
   }
   return false;
 }
+
+// --- clic droit : actions rapides --------------------------------------------
+
+// Le menu du navigateur ("Enregistrer l'image sous...") ne sert a rien sur
+// une carte. On le remplace par les actions qu'on fait le plus souvent a un
+// endroit precis : trajet, base, talkies, coordonnees. Maj + clic droit rend
+// le menu du navigateur, pour qui en aurait besoin.
+
+let minuteurAnnonce = 0;
+
+/** Message bref dans la consigne flottante, puis retour a la consigne normale. */
+function annoncer(texte) {
+  clearTimeout(minuteurAnnonce);
+  consigne(texte);
+  document.body.classList.remove('pose-en-cours');
+  minuteurAnnonce = setTimeout(majConsigne, 1600);
+}
+
+async function copier(texte) {
+  try {
+    await navigator.clipboard.writeText(texte);
+  } catch (e) {
+    // Hors contexte securise (fichier ouvert en file://), l'API est refusee :
+    // on passe par une zone de texte temporaire.
+    const z = document.createElement('textarea');
+    z.value = texte;
+    z.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(z);
+    z.select();
+    const ok = document.execCommand('copy');
+    z.remove();
+    if (!ok) { annoncer('copie impossible : ' + texte); return; }
+  }
+  annoncer('copie : ' + texte);
+}
+
+function entreesMarqueur(index) {
+  const m = etat.tous[index];
+  if (!m) return [];
+  const suivi = loot.date(m) > 0;
+  return [
+    { titre: m.t, sous: m.cat },
+    { libelle: suivi ? 'remettre le chrono a zero' : 'marquer comme pille', action: () => {
+      if (suivi) loot.effacer(m); else loot.marquer(m);
+      majBandeauLoot();
+      reinitialiserAffichage();
+      demanderRendu(true);
+    } },
+    { libelle: 'trajet jusqu\'ici', aide: 'depuis ta base', action: () => trajetVers(m) },
+    { libelle: 'voir dans la liste', action: () => {
+      $('recherche').value = '';
+      allerOnglet('lieux');
+      selectionner(index, false);
+    } },
+    { sep: true },
+  ];
+}
+
+function entreesBase(id) {
+  const b = bases.trouver(id);
+  if (!b) return [];
+  return [
+    { titre: b.nom, sous: 'base' },
+    { libelle: 'gerer la base', aide: 'nom, couleur', action: () => {
+      bases.etat.selection = b.id;
+      allerOnglet('bases');
+      demanderRendu();
+    } },
+    { libelle: 'supprimer la base', action: () => {
+      if (confirm(`Supprimer la base "${b.nom}" ?`)) { bases.supprimer(b.id); demanderRendu(); }
+    } },
+    { sep: true },
+  ];
+}
+
+function entreesVehicule(cle) {
+  const v = vehicules.trouver(cle);
+  if (!v) return [];
+  return [
+    { titre: v.n || v.s || 'vehicule', sous: 'vehicule' },
+    { libelle: 'ouvrir la fiche', action: () => { vehicules.ouvrirFiche(cle); demanderRendu(); } },
+    { sep: true },
+  ];
+}
+
+function menuCarte(e) {
+  const r = carte.getBoundingClientRect();
+  const ex = e.clientX - r.left, ey = e.clientY - r.top;
+  const x = ecranVersMondeX(ex, ey), y = ecranVersMondeY(ex, ey);
+  const cx = Math.floor(x), cy = Math.floor(y);
+  const ici = { x, y };
+
+  // Ce qu'il y a sous la souris passe en premier.
+  const mq = e.target.closest('.mq');
+  const base = e.target.closest('.base');
+  const vh = e.target.closest('.vh');
+  const specifiques = mq ? entreesMarqueur(+mq.dataset.index)
+    : base ? entreesBase(base.dataset.id)
+    : vh ? entreesVehicule(vh.dataset.cle)
+    : [];
+
+  const moi = joueur.positionMoi();
+  const distance = moi ? Math.round(Math.hypot(moi.x - x, moi.y - y)) : null;
+  const etapes = trajet.etat.etapes;
+
+  menu.ouvrir(e.clientX, e.clientY, [
+    ...specifiques,
+    { titre: `x ${cx} · y ${cy}`,
+      sous: distance !== null ? `a ${distance.toLocaleString('fr-FR')} cases de toi` : '' },
+    { libelle: 'copier les coordonnees', aide: `${cx}, ${cy}`, action: () => copier(`${cx}, ${cy}`) },
+    { libelle: 'centrer la vue ici', action: () => { centrerSur(x, y); demanderRendu(true); } },
+    { libelle: 'zoomer ici', action: () => { zoomer(1, ex, ey); demanderRendu(true); },
+      desactive: vue.zoom >= zoomMax() },
+    { sep: true },
+    { libelle: 'aller ici', aide: moi ? 'depuis ta position' : 'arrivee du trajet', action: () => {
+      if (moi) trajet.definirEtapes([moi, ici]);
+      else allerVers(ici);
+      allerOnglet('trajet');
+    } },
+    { libelle: 'partir d\'ici', aide: 'depart du trajet', action: () => partirDe(ici) },
+    etapes.length > 0 && { libelle: 'ajouter une etape ici', aide: `etape ${etapes.length + 1}`,
+      action: () => { trajet.ajouterEtape(x, y); allerOnglet('trajet'); } },
+    { sep: true },
+    { libelle: 'poser une base ici', action: () => poserBase(x, y) },
+    { libelle: 'centrer les talkies ici', aide: 'portee radio', action: () => {
+      radio.etat.epingle = { x: cx, y: cy };
+      radio.etat.centre = 'epingle';
+      radio.etat.actif = true;
+      $('calqueRadio').checked = true;
+      radio.enregistrer();
+      majCentresRadio();
+      demanderRendu();
+    } },
+    moi && { libelle: 'me suivre', aide: 'touche F', action: () => joueur.basculerSuivi(true, 'moi') },
+  ]);
+}
+
+carte.addEventListener('contextmenu', e => {
+  if (e.shiftKey) return;              // menu du navigateur, a la demande
+  e.preventDefault();
+  menuCarte(e);
+});
 
 // --- demarrage -------------------------------------------------------------
 

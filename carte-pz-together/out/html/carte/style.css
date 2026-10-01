@@ -772,3 +772,92 @@ body.replie #suivre { right: 8px; }
 #listeVehicules .ligne-vh i { width: 10px; height: 10px; border-radius: 2px; flex: none; border: 1px solid rgba(0,0,0,.8); }
 #listeVehicules .ligne-vh span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #listeVehicules .ligne-vh em { font-style: normal; font-size: 11px; color: var(--faible); white-space: nowrap; }
+
+/* ---- Sous-onglets -------------------------------------------------------- */
+.sous-onglets {
+  display: flex;
+  gap: 4px;
+  padding: 8px 14px 6px;
+  border-bottom: 1px solid var(--trait);
+}
+.sous-onglets button {
+  flex: 1;
+  padding: 3px 6px;
+  font-size: 11px;
+  border-radius: 12px;
+  background: none;
+  color: var(--faible);
+  white-space: nowrap;
+}
+.sous-onglets button:hover { color: var(--texte); }
+.sous-onglets button.actif { background: #2b3542; border-color: #59b7ff; color: #fff; }
+.sous-onglets .nb { font-style: normal; font-size: 10px; color: var(--accent); }
+.sous-onglets .nb:empty { display: none; }
+.sous-volet { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: auto; }
+.sous-volet[hidden] { display: none; }
+
+/* ---- Filtres ranges par famille ------------------------------------------ */
+#filtres { display: block; }
+.famille + .famille { margin-top: 6px; }
+#filtres .tete-famille {
+  width: 100%;
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid #2a2e36;
+  color: var(--texte);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+.famille .cats { display: flex; flex-wrap: wrap; gap: 2px 0; padding-left: 4px; }
+
+/* ---- Menu du clic droit -------------------------------------------------- */
+#menuCarte {
+  position: fixed;
+  z-index: 90;                     /* au-dessus des infobulles (60) */
+  min-width: 210px;
+  max-width: 300px;
+  padding: 4px 0;
+  border: 1px solid #4a4a52;
+  border-radius: 6px;
+  background: rgba(20, 20, 24, .97);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .6);
+  font-size: 12px;
+  user-select: none;
+}
+#menuCarte[hidden] { display: none; }
+#menuCarte .titre {
+  padding: 5px 12px 3px;
+  font-weight: 600;
+  color: var(--texte);
+  font-variant-numeric: tabular-nums;
+}
+#menuCarte .titre small {
+  display: block;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--faible);
+}
+#menuCarte .titre small:empty { display: none; }
+#menuCarte .sep { height: 1px; margin: 4px 0; background: #2e2e36; }
+#menuCarte button {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  width: 100%;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  text-align: left;
+  font-size: 12px;
+}
+#menuCarte button:hover, #menuCarte button:focus { background: #2b3542; outline: none; }
+#menuCarte button:disabled { opacity: .4; cursor: default; background: none; }
+#menuCarte .aide-menu {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--faible);
+  white-space: nowrap;
+}
