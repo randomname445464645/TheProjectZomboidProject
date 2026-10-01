@@ -1,0 +1,65 @@
+# Cartes du serveur PZ together (versions B42)
+
+Trelai_B42:
+  display_name: Trelai (B42)
+  mod_name: Trelai_B42
+  steam_id: '3768876083'
+  map_name: Trelai_4x4
+  texture: true
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/42/media/maps/{map_name}'
+  texture_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/texturepacks'
+
+Greenport_B42:
+  display_name: Greenport, KY (B42)
+  mod_name: Greenport B42
+  steam_id: '3747595202'
+  map_name: 'Greenport, KY'
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+
+Maplewood_B42:
+  display_name: Maplewood
+  mod_name: Maplewood
+  steam_id: '3644794945'
+  map_name: Maplewood
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+
+Chestown_B42:
+  display_name: Chestown, KY
+  mod_name: Chestown
+  steam_id: '2840889213'
+  map_name: 'Chestown, KY'
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+
+LQZ_B42:
+  display_name: Louisville Quarantine Zone
+  mod_name: Louisville Quarantine Zone
+  steam_id: '2934132344'
+  map_name: Louisville_Quarantine_Zone
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+
+Constown_B42:
+  display_name: Constown, KY
+  mod_name: Constown
+  steam_id: '3480990544'
+  map_name: 'Constown, KY'
+  texture: true
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+  texture_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/texturepacks'
+
+RavenCreek_B42:
+  display_name: Raven Creek B42
+  mod_name: Raven Creek B42
+  steam_id: '3484263516'
+  map_name: Raven Creek B42
+  texture: true
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+  texture_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/texturepacks'
+
+NewHartburg_B42:
+  display_name: New Hartburg, KY
+  mod_name: New Hartburg
+  steam_id: '3741334453'
+  map_name: 'New Hartburg, KY'
+  texture: true
+  map_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/maps/{map_name}'
+  texture_path: '{mod_root}/{steam_id}/mods/{mod_name}/common/media/texturepacks'

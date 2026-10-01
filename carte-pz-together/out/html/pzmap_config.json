@@ -1,0 +1,20 @@
+{
+  "route": {
+    "default": "map_data/"
+  },
+  "features": {
+    "map": true,
+    "grid": true,
+    "marker": true,
+    "trimmer": true,
+    "zombie": true,
+    "foraging": true,
+    "rooms": true,
+    "objects": true,
+    "streets": true,
+    "coords": true
+  },
+  "version": "1.1.14",
+  "git_branch": "refs/heads/main",
+  "git_commit": "5025122c1a6de655122d79ef84dfcb40a632ea68"
+}

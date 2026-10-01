@@ -1,0 +1,61 @@
+# --- Sorties de rendu -------------------------------------------------------
+# La vue de dessus EST versionnee : 197 Mio, 13 162 fichiers, 33 min de rendu.
+# C'est ce qui permet de cloner et d'ouvrir la carte sans rien recalculer.
+#
+# L'isometrique ne l'est pas et ne peut pas l'etre : 358 Gio et 1 663 558
+# fichiers, tres au-dela de ce que git et GitHub savent porter. Dans un clone
+# de travail, out/html/map_data/base est un lien symbolique vers le volume qui
+# le contient ; les regles ci-dessous l'excluent avec ses homologues moddes.
+# Pas de barre oblique finale : dans un clone de travail ces entrees sont des
+# LIENS symboliques vers le volume de rendu, donc des fichiers pour git, qu'une
+# regle en "base/" ne matcherait pas.
+out/html/map_data/base
+out/html/map_data/mod_maps/*/base
+
+# Pyramide du calque des constructions : environ 2 Go, regeneree par
+# outils/agent-monde/rendre-calque.py a partir du releve, qui est lui-meme
+# propre a chaque joueur.
+out/html/map_data/constructions
+out/html/map_data/rooms
+out/html/map_data/objects
+out/html/map_data/mod_maps/*/rooms
+out/html/map_data/mod_maps/*/objects
+out/html/map_data_sqr1/
+out/texture/
+out2/
+out3/
+
+# Les noms de rues, eux, sont versionnes : 283 Ko de polylignes en JSON, pas
+# une pyramide d'images, et sans eux la case "noms de rues" ne fait rien.
+
+
+# --- Environnement ----------------------------------------------------------
+.venv/
+__pycache__/
+*.pyc
+
+# --- Historique amont de pzmap2dzi ------------------------------------------
+# Le clone d'origine (cff29546/pzmap2dzi) est conserve sous ce nom pour pouvoir
+# suivre l'amont, mais il n'a pas sa place dans ce depot.
+pzmap2dzi/.git-upstream/
+
+# --- Donnees personnelles de jeu ---------------------------------------------
+# Releve des constructions produit par l'agent d'export : propre a chaque
+# joueur, grossit a chaque session, et n'a pas a etre partage.
+out/html/constructions.json
+out/html/constructions-sprites.json
+
+# Lien vers les 704 Mo de textures extraites, pour que le navigateur puisse
+# dessiner les vrais sprites. Regenerable par "main.py unpack".
+out/html/texture
+
+# Sortie de compilation de l'agent
+outils/agent-monde/classes/
+
+# --- Divers -----------------------------------------------------------------
+*.pending
+*.empty
+
+# Captures de la doc amont de pzmap2dzi, 7 Mo de gifs sans rapport avec ce projet.
+pzmap2dzi/docs/img/
+out/html/map_data/itineraire/construction.log

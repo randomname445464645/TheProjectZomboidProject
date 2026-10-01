@@ -1,0 +1,2 @@
+save_path=/home/kiri/Zomboid/Saves
+host=127.0.0.1
