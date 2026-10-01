@@ -53,7 +53,8 @@ import zombie.util.list.PZArrayList;
  *                          defaut 1000, 0 pour ne pas l'ecrire
  *     journal=0            n'enregistre pas les deplacements (voir Journal) ;
  *                          par defaut ils sont notes dans traces/AAAA-MM-JJ.ndjson
- *     vehicules=<s>        intervalle de releve des vehicules, defaut 5, 0 pour
+ *     vehicules=<s>        intervalle de releve des vehicules, defaut 1 (decimales
+ *                          acceptees, 0,2 au minimum), 0 pour
  *                          ne pas les relever (voir Vehicules, JournalVehicules)
  *
  * POSITION DU JOUEUR
@@ -83,7 +84,11 @@ public final class Agent {
     private static boolean tout = false;
     private static long periodePositionMs = 1000L;
     private static boolean journalActif = true;
-    private static long periodeVehiculesMs = 5000L;
+    // Une seconde, comme la position : un vehicule a 80 km/h fait 22 cases
+    // par seconde, a 5 s d'intervalle il sautait d'une rue a l'autre sur la
+    // carte. Le releve complet d'une soixantaine de vehicules ne coute que
+    // quelques millisecondes.
+    private static long periodeVehiculesMs = 1000L;
 
     // Signature de la derniere version vue de chaque case, pour n'ecrire que
     // ce qui a change. Cle = (x, y, z) empaquetes, valeur = hachage du contenu.
@@ -139,8 +144,9 @@ public final class Agent {
                     if (periodePositionMs > 0 && periodePositionMs < 200) periodePositionMs = 200;
                 }
                 case "vehicules" -> {
-                    try { periodeVehiculesMs = Math.max(0L, Long.parseLong(val) * 1000L); }
+                    try { periodeVehiculesMs = Math.max(0L, Math.round(Double.parseDouble(val) * 1000)); }
                     catch (NumberFormatException ignore) { }
+                    if (periodeVehiculesMs > 0 && periodeVehiculesMs < 200) periodeVehiculesMs = 200;
                 }
                 case "tout"   -> tout = "1".equals(val) || "true".equalsIgnoreCase(val);
             }
@@ -367,7 +373,7 @@ public final class Agent {
                     try {
                         journal.noter(l, t, h);
                     } catch (Throwable e) {
-                        if (erreursJournal++ % 12 == 0) {
+                        if (erreursJournal++ % 60 == 0) {
                             System.out.println("[pz-export] journal vehicules ignore : " + e);
                         }
                     }
@@ -375,7 +381,7 @@ public final class Agent {
             } catch (InterruptedException e) {
                 return;
             } catch (Throwable e) {
-                if (erreurs++ % 12 == 0) {
+                if (erreurs++ % 60 == 0) {
                     System.out.println("[pz-export] vehicules ignores : " + e);
                 }
             }

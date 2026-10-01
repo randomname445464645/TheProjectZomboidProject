@@ -1501,7 +1501,6 @@ function majVehiculesUI() {
   const n = vehicules.nombres();
   $('nbVehicules').textContent = n.presents ? String(n.presents) : '';
   $('nbVehiculesVus').textContent = n.vus ? String(n.vus) : '';
-  $('nbVehiculesAmorce').textContent = n.amorce ? String(n.amorce) : '';
   $('etatVehicules').textContent = vehicules.texteEtat();
 
   // Les plus proches, pour retrouver une voiture sans chercher le carre.
@@ -1531,8 +1530,7 @@ function majVehiculesUI() {
 
 function initVehiculesPanneau() {
   vehicules.initVehicules($('vehiculesCalque'), majVehiculesUI, () => demanderRendu());
-  const cases = [['calqueVehicules', 'actif'], ['calqueVehiculesVus', 'anciens'],
-                 ['calqueVehiculesAmorce', 'amorce']];
+  const cases = [['calqueVehicules', 'actif'], ['calqueVehiculesVus', 'anciens']];
   for (const [id, cle] of cases) {
     $(id).checked = vehicules.etat[cle];
     $(id).addEventListener('change', function () {
