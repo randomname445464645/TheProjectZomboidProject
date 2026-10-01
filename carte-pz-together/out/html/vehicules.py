@@ -88,6 +88,8 @@ def _integrer(e):
     y = v.get('y') if v else e.get('y')
     vu = {'t': t, 'h': e.get('h'), 'x': x, 'y': y}
     f = _fiches.get(k)
+    if f is not None and not v and f['fiche'] and t >= f['dernier']['t']:
+        _suivre_cap(f, e, x, y, t)
     if f is None:
         f = _fiches[k] = {'k': k, 'premier': vu, 'dernier': vu, 'passages': 1,
                           'fiche': None, 'lieux': [], 'parti': False}
@@ -107,6 +109,37 @@ def _integrer(e):
             lieux.append([round(x), round(y), t])
             if len(lieux) > MAX_LIEUX:
                 del lieux[1]   # on garde le tout premier lieu
+
+
+# Sous ce deplacement, ou au-dela de ce delai, le trajet ne dit rien du cap.
+TRAJET_MIN = 2.0      # cases
+TRAJET_MAX = 30000    # ms
+
+
+def _suivre_cap(f, e, x, y, t):
+    """Met a jour le cap d'un vehicule sur un evenement sans fiche (d, p, f).
+
+    L'agent ne mettait le cap que dans les fiches completes (apparition,
+    modification) : un vehicule conduit gardait sur la carte le cap de son
+    apparition, a sa nouvelle place. Les agents recents l'ecrivent aussi
+    dans d, p et f ; pour le journal plus ancien, on prend la direction du
+    dernier trajet, ce qui suppose qu'il roulait en marche avant.
+    """
+    if isinstance(e.get('cap'), list):
+        c = {'cap': e['cap']}
+        _corriger_cap(c)
+        cap, estime = c['cap'], False
+    else:
+        d = f['dernier']
+        if not all(isinstance(a, (int, float)) for a in (x, y, d['x'], d['y'])):
+            return
+        dx, dy = x - d['x'], y - d['y']
+        n = (dx * dx + dy * dy) ** 0.5
+        if n < TRAJET_MIN or t - d['t'] > TRAJET_MAX:
+            return
+        cap, estime = [round(dx / n, 3), round(dy / n, 3)], True
+    if cap[0] or cap[1]:
+        f['fiche'] = {**f['fiche'], 'cap': cap, 'capEstime': estime}
 
 
 def _lire_journal():

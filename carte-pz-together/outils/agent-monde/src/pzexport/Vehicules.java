@@ -41,8 +41,10 @@ final class Vehicules {
 
     private Vehicules() { }
 
-    /** Un vehicule releve : sa cle, sa position, et sa fiche JSON complete. */
-    record Releve(String cle, float x, float y, String signature, String json) { }
+    /** Un vehicule releve : sa cle, sa position, son cap (tel qu'ecrit dans la
+     *  fiche, voir lireUn), et sa fiche JSON complete. */
+    record Releve(String cle, float x, float y, float capX, float capY,
+                  String signature, String json) { }
 
     /** L'heure du monde de jeu, "AAAA-MM-JJ HH:MM", ou null au menu. */
     static String heureJeu() {
@@ -215,6 +217,6 @@ final class Vehicules {
                 + "|" + (toutVerrouille ? 2 : uneVerrouillee ? 1 : 0)
                 + "|" + (v.isKeysInIgnition() ? 1 : 0) + (v.isKeyIsOnDoor() ? 1 : 0)
                 + (v.isHotwired() ? 1 : 0) + (jaiLaCle ? 1 : 0) + "|" + objets;
-        return new Releve(cle, x, y, signature, b.toString());
+        return new Releve(cle, x, y, capX, capY, signature, b.toString());
     }
 }

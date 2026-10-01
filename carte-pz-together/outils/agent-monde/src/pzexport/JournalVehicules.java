@@ -24,10 +24,12 @@ import java.util.Set;
  * Une ligne par EVENEMENT, pas par lecture :
  *     "e":"a"  apparition : le vehicule entre dans la zone chargee. Fiche complete.
  *     "e":"m"  modification : essence, etat, verrous, cles... Fiche complete.
- *     "e":"d"  deplacement de DEPLACE cases ou plus, rien d'autre n'a change.
- *              Cle et position seulement : un vehicule qu'on conduit en
- *              ecrit une par lecture, la fiche complete y serait du gaspillage.
- *     "e":"p"  toujours la, une fois par PRESENCE ms. Cle et position seulement.
+ *     "e":"d"  deplacement de DEPLACE cases ou plus, ou rotation de TOURNE
+ *              degres ou plus, rien d'autre n'a change. Cle, position et cap
+ *              seulement : un vehicule qu'on conduit en ecrit une par lecture,
+ *              la fiche complete y serait du gaspillage. Sans le cap, un
+ *              vehicule conduit garderait sur la carte celui de son apparition.
+ *     "e":"p"  toujours la, une fois par PRESENCE ms. Cle, position et cap.
  *     "e":"f"  fin : absent depuis ABSENCE ms. En temps et pas en nombre de
  *              lectures : l'intervalle de releve est reglable.
  * Chaque ligne porte "t" (heure reelle, ms) et "h" (heure du monde de jeu).
@@ -42,11 +44,12 @@ import java.util.Set;
 final class JournalVehicules {
 
     static final double DEPLACE = 3.0;          // cases
+    static final double TOURNE = 20.0;          // degres
     static final long PRESENCE = 10 * 60_000L;  // ms
     static final long ABSENCE = 15_000L;        // ms
 
     private static final class Suivi {
-        float x, y;
+        float x, y, capX, capY;
         String signature;
         long ecrit;
         long vu;
@@ -80,7 +83,8 @@ final class JournalVehicules {
                 e = "a";
             } else if (!r.signature().equals(s.signature)) {
                 e = "m";
-            } else if (Math.hypot(r.x() - s.x, r.y() - s.y) >= DEPLACE) {
+            } else if (Math.hypot(r.x() - s.x, r.y() - s.y) >= DEPLACE
+                    || ecart(r.capX(), r.capY(), s.capX, s.capY) >= TOURNE) {
                 e = "d";
             } else if (t - s.ecrit >= PRESENCE) {
                 e = "p";
@@ -90,12 +94,13 @@ final class JournalVehicules {
             }
             s.vu = t;
             s.x = r.x(); s.y = r.y();
+            s.capX = r.capX(); s.capY = r.capY();
             s.signature = r.signature();
             s.ecrit = t;
             if (e.equals("p") || e.equals("d")) {
                 w.write(String.format(Locale.ROOT,
-                        "{\"e\":\"" + e + "\",\"t\":%d,\"h\":%s,\"k\":%s,\"x\":%.1f,\"y\":%.1f}",
-                        t, hj, Agent.chaine(r.cle()), r.x(), r.y()));
+                        "{\"e\":\"" + e + "\",\"t\":%d,\"h\":%s,\"k\":%s,\"x\":%.1f,\"y\":%.1f,\"cap\":[%.3f,%.3f]}",
+                        t, hj, Agent.chaine(r.cle()), r.x(), r.y(), r.capX(), r.capY()));
             } else {
                 w.write("{\"e\":\"" + e + "\",\"t\":" + t + ",\"h\":" + hj + ",\"v\":" + r.json() + "}");
             }
@@ -109,8 +114,9 @@ final class JournalVehicules {
             // Absent plusieurs lectures de suite : sorti de la zone chargee,
             // ou parti. Le revoir plus tard fera une nouvelle apparition.
             w.write(String.format(Locale.ROOT,
-                    "{\"e\":\"f\",\"t\":%d,\"h\":%s,\"k\":%s,\"x\":%.1f,\"y\":%.1f}",
-                    t, hj, Agent.chaine(m.getKey()), m.getValue().x, m.getValue().y));
+                    "{\"e\":\"f\",\"t\":%d,\"h\":%s,\"k\":%s,\"x\":%.1f,\"y\":%.1f,\"cap\":[%.3f,%.3f]}",
+                    t, hj, Agent.chaine(m.getKey()), m.getValue().x, m.getValue().y,
+                    m.getValue().capX, m.getValue().capY));
             w.write('\n');
             n++;
             it.remove();
@@ -128,5 +134,13 @@ final class JournalVehicules {
         // Nouveau fichier : chaque vehicule present y recommence par une
         // apparition, pour qu'un jour se lise seul.
         suivis.clear();
+    }
+
+    /** Angle entre deux caps, en degres ; 0 si l'un des deux est inconnu (nul). */
+    static double ecart(float ax, float ay, float bx, float by) {
+        if ((ax == 0 && ay == 0) || (bx == 0 && by == 0)) return 0;
+        double d = Math.toDegrees(Math.atan2(ay, ax) - Math.atan2(by, bx));
+        d = Math.abs(((d % 360) + 540) % 360 - 180);
+        return d;
     }
 }
