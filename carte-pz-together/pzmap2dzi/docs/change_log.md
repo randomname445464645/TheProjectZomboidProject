@@ -1,0 +1,221 @@
+# Change log
+
+# 2026-08-28: 1.1.17 + UI 1.1.14
+
+* Add texture filtering to skip textures by name pattern
+  * New `texture_filters` config option (regex list) under `render_conf` to exclude textures from rendering, e.g. jumbo tree textures (`'.*JUMBO.*'`)
+  * Filtered textures are still available for plant blending internally
+* Generalize large texture support
+  * Replace fixed jumbo-tree texture size (384x512) with a unified max texture size (1024x1024)
+  * Simplify render margin configuration: `texture` mode uses the max texture margin, explicit 4-value margins are supported, anything else defaults to no margin
+  * Base and save renders always use the max texture margin so base map and overlays stay aligned
+* Refactor texture library caching
+  * Split the texture cache into raw and filtered views so plant blending is lazy and sized to actual content
+  * Compute blended plant texture size from the affected area of its parts instead of a fixed canvas
+* Fix mark loader worker URL resolution in the web viewer and add worker error handling
+* Add map focus by query string parameters (`?x=&y=&z=&zoom=`)
+* Update tests and validation scripts for the texture cache changes
+
+# 2026-07-19: 1.1.16 + UI 1.1.13
+
+* Optimize multi-thread rendering framework
+
+# 2026-05-25: 1.1.15 + UI 1.1.13
+
+* Add fail dump output for save game rendering
+
+# 2026-05-22: 1.1.14 + UI 1.1.13
+
+* Improve map range configuration
+  * Split DZI output boundary selection from render filtering with `dzi_cell_range` and `render_cell_range`, deprecating the old `cell_range` option
+  * Add `all_mod_maps` boundary mode so base/save renders can include cells from configured overlay maps
+  * Allow explicit rectangle ranges to drive both isometric and top-view output bounds
+* Improve map path and header scanning robustness
+
+
+# 2026-05-21: 1.1.13 + UI 1.1.13
+
+* Fix crash when rendering out-of-bounds tile
+
+# 2026-04-26: 1.1.12 + UI 1.1.13
+
+* Improve console progress display
+* Fix python 2 compatibility
+
+# 2026-04-24: 1.1.11 + UI 1.1.13
+
+* Improve incremental render change detection
+  * Add `hash_method` config option to detect source changes via content hashing
+  * Adjust empty tile handling
+  * Improve cell range handling
+  * Fixed stale tile detection and cleanup logic
+* Refactor version/layer detection
+* Improve map clipping and mark filtering in the web viewer
+  * Add rectangle cover utilities to the web viewer
+  * Properly clip marks for mod map areas
+* Update tests and configuration
+
+# 2026-04-11: 1.1.10 + UI 1.1.12
+
+* Add zombie count marks
+
+# 2026-04-10: 1.1.9 + UI 1.1.11
+
+* Add incremental render planning framework for map/save outputs
+  * Add source snapshot tracking (`sources_current.json` -> `sources.json`) and source/tile signature scanning
+  * Add pending tile cleanup and stale tile detection and optional cleanup before render (`delete_stale_tiles` config option)
+  * Add output overwrite guard by validating `map_info.json` geometry keys before rendering
+* Add new source scanning utility module
+* Improve render task generation and geometry mapping
+  * Refactor DZI task generation to avoid redundant tiles
+  * Allow renderers to specify range to render instead of entire map (see `cell_range` in `render_conf`)
+  * Adjust scheduler to support non-connected tasks topology
+* Improve save-game rendering compatibility and source tracking
+* Improve output boundary calculation and render margin handling
+* Fix B41 foraging issue in isometric renderer
+* Improve utility helpers for serialization
+* Improve configuration docs and test setup
+
+# 2026-03-24: 1.1.8 + UI 1.1.11
+
+* Add save game render mode
+  * Add new render jobs: `save` and `save_top`
+  * Add parser loading flow for save data (latest/local pzdataspec)
+  * Add `run_saves.bat` for save render workflow (`deploy`, `unpack`, `render save save_top`)
+  * Extend render configuration for save rendering
+* Add save map support in web viewer
+  * Load/unload save maps from map UI
+  * Add save-map highlight toggle
+  * Rename "Mod Map" UI label to "Overlay Map"
+* Improve render engine internals and compatibility
+  * Initialize renderers with `init_dzi` hook
+  * Reuse draw context in workers to reduce repeated `ImageDraw` creation
+  * Improve top-view rendering fallback and tile processing behavior
+  * Update vegetation/jumbo tree handling for newer data mapping
+* Update dependencies
+  * Add `kaitaistruct` dependency for save game parsing
+  * Adjust Python 2/3 conditional versions for `pynput` and `lupa`
+* Update tests
+  * Add save-game test cases
+  * Add unified test runner and remove legacy runners
+  * Improve test setup/config merge behavior
+
+# 2025-09-25: 1.1.7 + UI 1.1.10
+
+* Fix Trimmer for game version B42.13+
+
+# 2025-09-25: 1.1.7 + UI 1.1.9
+
+* Optimize batch loading speed for R-Tree indexes
+
+# 2025-09-12: 1.1.7 + UI 1.1.8
+
+* Fix code linting issues
+* Add script to mark animl tracks on the map
+
+# 2025-09-12: 1.1.7 + UI 1.1.7
+
+* Add script to mark stash locations on the map
+
+# 2025-09-11: 1.1.6 + UI 1.1.7
+
+* Fix missing SVG overlay in full-page mode
+* Adapt mark editing for SVG overlays
+* Set SVG rendering as default
+
+# 2025-09-08: 1.1.6 + UI 1.1.6
+
+* Fix svg zoom
+
+# 2025-09-07: 1.1.6 + UI 1.1.5
+
+* Fix Python 2 compatibility
+
+# 2025-09-07: 1.1.5 + UI 1.1.5
+
+* Add texture location script
+
+# 2025-09-06: 1.1.4 + UI 1.1.5
+
+* Add coordinates overlay system
+
+# 2025-09-06: 1.1.4 + UI 1.1.4
+
+* Render marks with svg
+* Dynamic streets overlay
+
+# 2025-08-26: 1.1.3 + UI 1.1.3
+
+* Avoid redundant texture unpacking when files are already present
+
+# 2025-08-24: 1.1.2 + UI 1.1.3
+
+* Enable resizing of area marks
+* Render rooms and objects as area marks
+* Overlay rooms and objects dynamically in viewer
+
+# 2025-08-19: 1.1.1 + UI 1.1.2
+
+* Fix R-tree index deletion resulting illegal tree
+* Mark editor refactor
+* Add support of diff-sum area mark
+* Node debug mode R-tree index
+
+# 2025-08-15: 1.1.1 + UI 1.1.1
+
+* Better multi-rect area rendering
+* R-tree accelerated visible range mark rendering
+
+# 2025-06-12: 1.0.9 + UI 1.0.12
+
+* Add support of multi-rect area marks
+
+# 2025-05-23: 1.0.9 + UI 1.0.11
+
+* Marker system and dynamic ui refactor
+* Added square cursor
+
+# 2025-05-20: 1.0.9 + UI 1.0.10
+
+* Load overlays on start by params in the query string
+  * Example: `pzmap.html?overlays=zombie,foraging,room,objects`
+
+# 2025-03-19: 1.0.8 + UI 1.0.9
+
+* Align tiles to map origin
+
+# 2025-03-19: 1.0.6 + UI 1.0.9
+
+* Fix coordinates offset
+* Copy coordinates to clipboard by pressing 'c'
+
+# 2025-03-19: 1.0.6 + UI 1.0.8
+
+* Fix recent change to 'getSquare' function break Marker and Trimmer drag events
+* Optimize performance of 'i18n.update' function
+* Use named function for 'onMouseMove' to prevent duplication of anonymous listeners
+
+# 2025-03-18: 1.0.6 + UI 1.0.7
+
+* When only top view data exists, open as top view
+* Fix top view blurry by turn off OSD image smoothing
+
+# 2025-03-16: 1.0.6 + UI 1.0.6
+
+* Fix top view overlay rects render
+* Add pointer coordinates
+
+# 2025-03-14: 1.0.5 + UI 1.0.5
+
+* Rename the 'copy' command to 'deploy'
+* Add link to commit on UI
+
+# 2025-03-08: 1.0.4 + UI 1.0.4
+
+* Support B42.4 foraging zones
+* Customizable colors for foraging and objects
+
+# 2025-02-12: 1.0.3 + UI 1.0.2
+
+* B42 support
+* .pzby basement file parser

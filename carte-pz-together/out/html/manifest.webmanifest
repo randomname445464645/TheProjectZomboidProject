@@ -1,0 +1,17 @@
+{
+  "name": "Carte PZ together",
+  "short_name": "Carte PZ",
+  "description": "Carte de loot du serveur Project Zomboid PZ together, vue de dessus et isometrique.",
+  "start_url": "/carte.html",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14161a",
+  "theme_color": "#14161a",
+  "lang": "fr",
+  "icons": [
+    { "src": "/pwa/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/pwa/icone-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

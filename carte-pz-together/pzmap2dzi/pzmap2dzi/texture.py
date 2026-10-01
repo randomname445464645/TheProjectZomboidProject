@@ -1,0 +1,419 @@
+from __future__ import print_function
+from PIL import Image
+from PIL.PngImagePlugin import PngInfo
+import PIL
+import io
+import os
+import re
+import struct
+import time
+import yaml
+import hashlib
+
+if __package__ is not None:
+    from . import mptask, binfile, util, plants
+
+try:
+    from . import shared_memory_image
+except ImportError:
+    shared_memory_image = None
+
+
+def read_texture(data, pos):
+    texture = {}
+    name, pos = util.read_bytes_with_length(data, pos)
+    texture['name'] = name.decode('utf8')
+    texture['x'], pos = util.read_int32(data, pos)
+    texture['y'], pos = util.read_int32(data, pos)
+    texture['w'], pos = util.read_int32(data, pos)
+    texture['h'], pos = util.read_int32(data, pos)
+    texture['ox'], pos = util.read_int32(data, pos)
+    texture['oy'], pos = util.read_int32(data, pos)
+    texture['ow'], pos = util.read_int32(data, pos)
+    texture['oh'], pos = util.read_int32(data, pos)
+    return texture, pos
+
+
+def read_page(data, pos, version):
+    page = {}
+    page['name'], pos = util.read_bytes_with_length(data, pos)
+    count, pos = util.read_uint32(data, pos)
+    page['has_alpha'], pos = util.read_uint32(data, pos)
+    textures = []
+    for i in range(count):
+        texture, pos = read_texture(data, pos)
+        textures.append(texture)
+    page['textures'] = textures
+    if version == 0:
+        # magic 0xdeadbeef little endian
+        page['png'], pos = util.read_until(data, pos, b'\xef\xbe\xad\xde')
+    elif version == 1:
+        page['png'], pos = util.read_bytes_with_length(data, pos)
+    else:
+        print('Unsupported pack version {}'.format(version))
+
+    return page, pos
+
+
+def load_pack(path):
+    data = b''
+    with open(path, 'rb') as f:
+        data = f.read()
+    version, pos = binfile.get_version(data, 0, b'PZPK', (0, 0))
+    page_num, pos = util.read_uint32(data, pos)
+    print('{}: version {}, {} pages'.format(path, version, page_num))
+    pages = []
+    for i in range(page_num):
+        page, pos = read_page(data, pos, version)
+        pages.append(page)
+    return pages
+
+
+def color_sum(pixels):
+    total = len(pixels)
+    if total > 0:
+        r, g, b, _ = map(sum, zip(*pixels))
+        return r, g, b, total
+    return 0, 0, 0, 1
+
+
+def gethash(path, method='md5'):
+    with io.open(path, 'rb') as f:
+        data = f.read()
+        hasher = getattr(hashlib, method)()
+        hasher.update(data)
+        return ':'.join((method, hasher.hexdigest()))
+
+
+class Texture(object):
+    def __init__(self, im, offset=None):
+        # offset is from the bottom center of the square
+        if offset:
+            ox, oy = offset
+        else:
+            ox = int(im.info.get('ox', 0))
+            oy = int(im.info.get('oy', 0))
+        bbox = im.getbbox()
+        if bbox is None:
+            self.im = Image.new('RGBA', (0, 0))
+            self.ox = 0
+            self.oy = 0
+        elif bbox != (0, 0) + im.size:
+            self.im = im.crop(bbox)
+            self.ox = bbox[0] + ox
+            self.oy = bbox[1] + oy
+        else:
+            self.im = im
+            self.ox = ox
+            self.oy = oy
+        self.color_sum = None
+
+    if tuple(map(int, PIL.__version__.split('.'))) >= (10, 4, 0):
+        def render(self, target, x, y):
+            x = x + self.ox
+            y = y + self.oy
+            target.alpha_composite(self.im, (x, y))
+    else:
+        def render(self, target, x, y):
+            w, h = self.im.size
+            x = x + self.ox
+            y = y + self.oy
+            base = target.crop((x, y, x + w, y + h))
+            result = Image.alpha_composite(base, self.im)
+            target.paste(result, (x, y))
+
+    def get_color_sum(self):
+        if self.color_sum is None:
+            pixels = list(filter(lambda x: x[3] == 255, self.im.getdata()))
+            self.color_sum = color_sum(pixels)
+        return self.color_sum
+
+    def save(self, path):
+        metadata = PngInfo()
+        metadata.add_text('ox', str(self.ox))
+        metadata.add_text('oy', str(self.oy))
+        self.im.save(path, pnginfo=metadata)
+
+    def get_affected_area(self):
+        w, h = self.im.size
+        left = max(0, -self.ox)
+        top = max(0, -self.oy)
+        right = max(0, self.ox + w)
+        bottom = max(0, self.oy + h)
+        return left, top, right, bottom
+
+
+class TextureLibrary(object):
+    @staticmethod
+    def get_size(shm):
+        while shm.buf[0] != 1:
+            # spin lock wait
+            # time.sleep(0.1)
+            pass
+
+        w, h = struct.unpack('ii', shm.buf[4:12])
+        return w, h
+
+    def __init__(self, texture_path=[], cache_name='',
+                 page_mode=False, page_size=1024):
+        self.texture_path = texture_path
+        self.use_shared_memory_cache = True if cache_name else False
+        self.page_mode = page_mode
+        self.page_size = page_size
+        self.page = []
+        self.page_buffer = None
+        self.mapping = {}
+        self.mem = None
+        if self.use_shared_memory_cache and shared_memory_image:
+            prefix = 'tl.{}.{}'.format(os.getpid(), cache_name)
+            self.mem = shared_memory_image.ImageSharedMemory(prefix, 32)
+        self.raw_cache = {} # including filtered
+        self.local_cache = {} # cache with filtered texture removed
+        self.filters = []
+        self.blend_mapping = {}
+        self.init_hash()
+
+    def init_hash(self):
+        self.hash = {}
+        for path in self.texture_path:
+            hash_file = os.path.join(path, 'hash.yaml')
+            if os.path.isfile(hash_file):
+                with io.open(hash_file, 'r') as f:
+                    self.hash.update(yaml.safe_load(f) or {})
+
+    def add_texture_filters(self, filters):
+        for f in filters:
+            self.filters.append(re.compile(f))
+
+    def save_to_local_cache(self, name, texture):
+        self.raw_cache[name] = texture
+        if self.is_name_filtered(name):
+            texture = None
+        self.local_cache[name] = texture
+
+    def add_pack(self, path, debug=False):
+        if not os.path.isfile(path):
+            return
+        hash = gethash(path)
+        if self.hash.get(path) == hash:
+            print('{}: hash unchanged, skip.'.format(path))
+            return
+        else:
+            self.hash[path] = hash
+        pages = load_pack(path)
+        total = len(pages)
+        for idx, page in enumerate(pages):
+            print('Processing pages: {}/{}'.format(idx + 1, total), end='\r')
+            im = Image.open(io.BytesIO(page['png']))
+            if self.page_mode:
+                page_id = len(self.page)
+                self.page.append(im)
+            for t in page['textures']:
+                name = t['name']
+                x, y, w, h = t['x'], t['y'], t['w'], t['h']
+                ox, oy, ow, oh = t['ox'], t['oy'], t['ow'], t['oh']
+                ox -= ow >> 1
+                oy -= oh
+                texture = Texture(im.crop((x, y, x + w, y + h)), (ox, oy))
+                if debug and self.local_cache.get(name, None):
+                    print('Conflict texture: {}'.format(name))
+                self.save_to_local_cache(name, texture)
+                if self.page_mode:
+                    self.mapping[name] = page_id, x, y, w, h, ox, oy
+
+    def set_texture_path(self, path):
+        self.texture_path = path
+
+    def load_raw_texture(self, name):
+        for path in self.texture_path:
+            file_path = os.path.join(path, name + '.png')
+            if os.path.exists(file_path):
+                im = Image.open(file_path)
+                if im:
+                    return Texture(im)
+
+    def load_from_shared_memory(self, name):
+        t = None
+        if self.mem is not None:
+            im = self.mem.load(name, size_func=TextureLibrary.get_size)
+            if im:
+                extra = self.mem.get_extra(name)
+                ox, oy = struct.unpack('ii', extra[12:20])
+                t = Texture(im, (ox, oy))
+        return t
+
+    def save_to_shared_memory(self, name, t):
+        if self.mem is not None:
+            cached_im = self.mem.create(name, *t.im.size)
+            if cached_im:
+                cached_im.paste(t.im, (0, 0))
+                extra = self.mem.get_extra(name)
+                info = t.im.size + (t.ox, t.oy)
+                extra[4:20] = struct.pack('iiii', *info)
+                extra[0] = 1
+
+            # free current and reload using shared memory
+            cached = self.load_from_shared_memory(name)
+            if cached:
+                return cached
+        return t
+
+    def load_pages(self):
+        if self.texture_path:
+            page_ids = []
+            pattern = re.compile('(\\d+)\\.png')
+            for f in os.listdir(self.texture_path):
+                m = pattern.match(f)
+                if m:
+                    page_ids.append(int(m.groups()[0]))
+            path = os.path.join(self.texture_path, 'mapping.yaml')
+            if os.path.exists(path):
+                with open(path, 'r') as f:
+                    self.mapping = yaml.safe_load(f.read())
+            page_count = max(page_ids) + 1
+            w, h = self.page_size, self.page_size
+            self.page_buffer = memoryview(bytes(4 * w * h * page_count))
+            for pid in page_ids:
+                path = os.path.join(self.texture_path, '{}.png'.format(pid))
+                if os.path.exists(path):
+                    im = Image.open(path)
+                    if im:
+                        offset = 4 * w * h * pid
+                        buf_im = Image.frombuffer('RGBA', (w, h),
+                                                  self.page_buffer[offset:],
+                                                  'raw', 'RGBA', 0, 1)
+                        buf_im.readonly = 0
+                        buf_im.paste(im, (0, 0))
+
+    def load_texture(self, name):
+        t = self.load_from_shared_memory(name)
+
+        if t is None:
+            if name in self.blend_mapping:
+                t = self.blend_textures(self.blend_mapping[name])
+            else:
+                t = self.load_raw_texture(name)
+            if t is not None:
+                t = self.save_to_shared_memory(name, t)
+
+        return t
+
+    def is_name_filtered(self, name):
+        for f in self.filters:
+            if f.match(name):
+                return True
+        return False
+
+
+    def get_by_name_ignore_filter(self, name):
+        if name in self.raw_cache:
+            return self.raw_cache[name]
+
+        t = self.load_texture(name)
+        self.save_to_local_cache(name, t)
+        return t
+
+    def get_by_name(self, name):
+        if name in self.local_cache:
+            return self.local_cache[name]
+
+        t = self.load_texture(name)
+        if t is None:
+            print('Missing texture [{}]'.format(name))
+        self.save_to_local_cache(name, t)
+        return self.local_cache[name]
+
+    def save_all(self, path, parallel=1):
+        if not util.ensure_folder(path):
+            return False
+        if self.page_mode:
+            tasks = list(enumerate(self.page))
+            with open(os.path.join(path, 'mapping.yaml'), 'w') as f:
+                f.write(yaml.safe_dump(self.mapping))
+        else:
+            tasks = list(filter(lambda x: x[1], self.local_cache.items()))
+        if not tasks:
+            return
+        t = mptask.Task(SaveImg(path), True)
+        t.run(tasks, parallel)
+        with open(os.path.join(path, 'hash.yaml'), 'w') as f:
+            f.write(yaml.safe_dump(self.hash))
+
+    def get_affected_area(self, names, apply_filters=True):
+        l, u, r, b = 0, 0, 0, 0
+        for name in names:
+            if apply_filters:
+                t = self.get_by_name(name)
+            else:
+                t = self.get_by_name_ignore_filter(name)
+            if t:
+                left, top, right, bottom = t.get_affected_area()
+                l = max(l, left)
+                r = max(r, right)
+                u = max(u, top)
+                b = max(b, bottom)
+        return l, u, r, b
+
+    def blend_textures(self, names):
+        l, u, r, b = self.get_affected_area(names, False)
+        w = 2 * max(l, r)
+        h = u
+        im = Image.new('RGBA', (w, h + b))
+        x = w >> 1
+        y = h
+        for name in names:
+            t = self.get_by_name_ignore_filter(name)
+            if t:
+                t.render(im, x, y)
+        return Texture(im, (-x, -y))
+
+    def register_blend_name(self, name, texture_names):
+        self.blend_mapping[name] = texture_names
+
+    def config_plants(self, conf, register_only=True):
+        pi = plants.PlantsInfo(conf)
+        for key, names in pi.mapping.items():
+            self.register_blend_name(key, names)
+            if not register_only:
+                self.get_by_name(key)
+
+    def __del__(self):
+        if self.mem is not None:
+            self.local_cache = {}
+            self.raw_cache = {}
+            self.mem.clear()
+
+
+class SaveImg(object):
+    def __init__(self, path):
+        self.path = path
+
+    def on_job(self, job):
+        name, im = job
+        im.save(os.path.join(self.path, '{}.png'.format(name)))
+
+
+if __name__ == '__main__':
+    import argparse
+    parser = argparse.ArgumentParser(description='PZ texture unpacker')
+    parser.add_argument('-o', '--output', type=str, default='.')
+    parser.add_argument('-d', '--debug', action='store_true')
+    parser.add_argument('-t', '--test-plants', action='store_true')
+    parser.add_argument('-m', '--mp', type=int, default=1)
+    parser.add_argument('-p', '--page-mode', action='store_true')
+    parser.add_argument('packs', nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+
+    lib = TextureLibrary(page_mode=args.page_mode)
+    for pack_path in args.packs:
+        lib.add_pack(pack_path, args.debug)
+    if args.test_plants:
+        lib.config_plants({
+            'snow': True,
+            'flower': True,
+            'large_bush': True,
+            'tree_size': 3,
+            'jumbo_tree_size': 5,
+        }, False)
+    lib.save_all(args.output, args.mp)
+    # lib.save_pages(args.output)

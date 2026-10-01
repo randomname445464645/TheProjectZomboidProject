@@ -1,0 +1,351 @@
+pz_root: |- # project zomboid game folder
+    /home/kiri/.local/share/Steam/steamapps/common/ProjectZomboid/projectzomboid
+
+output_root: |- # rendu 2 px/case, dans out2 pour ne pas casser la carte servie
+    /mnt/data/pz-render/out-top
+
+mod_root: |- # steam workshop folder for project zomboid
+    /home/kiri/.local/share/Steam/steamapps/workshop/content/108600
+
+custom_root: |- # custom file folder
+    .
+
+save_game_root: |- # save game folder
+    /home/kiri/Zomboid/Saves
+
+# for multi map set
+# output_entry: map set name
+# output_route: map set data path
+output_entry: default
+output_route: map_data/
+
+# defult map or texture description fields
+# (relative from this config file location)
+# for b41, use default_b41.txt
+map_conf_default: default_b42.txt
+# maps and textures description files
+# (relative from this config file location)
+map_conf:
+    - vanilla.txt
+    - mod/
+
+# When use_depend_texture_only is set to true, only textures that are declared as
+# dependencies in the map's description will be used. This may cause the render
+# failure for maps with incomplete dependency descriptions.
+# The default setting is false, which means it will try to use all the textures
+# available in all declared mods.
+use_depend_texture_only: false
+
+# Specify maps to be rendered.
+# See vanilla.txt for map names.
+# default = Muldraugh, KY
+base_map: default
+
+# Additional overlay maps
+# See mod/ folder for map names.
+mod_maps:
+    - Trelai_B42
+    - Greenport_B42
+    - Maplewood_B42
+    - RavenCreek_B42
+    - Constown_B42
+    - NewHartburg_B42
+    - Chestown_B42
+    - LQZ_B42
+#    - Ashenwood
+#    - BedfordFalls
+#    - Blueberry
+#    - Chinatown
+#    - Chinatown expansion
+#    - FORTREDSTONE
+#    - Grapeseed
+#    - Greenleaf
+#    - lakeivytownship
+#    - Petroville
+#    - RavenCreek
+#    - Trelai_4x4_Steam
+
+# list of save game folders, the path is relative from save_game_root
+# e.g.
+# save_games:
+#    - Apocalypse/2026-02-26_15-11-44
+#    - Sandbox/2026-02-27_20-30-00
+#
+# or use 'all' to render all save games with same version of the base map
+# e.g.
+# save_games: []
+save_games: []
+
+render_conf:
+    # you can customize each setting under render_conf for each job or mod map by using the following syntax:
+    #     setting_name[<map name>](<render job>)
+    #     setting_name(<render job>)
+    #     setting_name[<map name>]
+    # examples:
+    #     verbose[Bedford Falls](base): false
+    #     verbose[default]: true
+    #     verbose(zombie): false
+
+    # main conf
+    verbose: true
+    # show profiling infomation
+    profile: false
+    # thread count, use 'auto' to set to cpu count
+    # bride a la moitie des threads, comme le rendu iso
+    worker_count: 8
+    # set hotkey to stop render (rerun render to resume)
+    # hotkey examples:
+    #     <ctrl>+<alt>+a    ctrl + alt + a
+    #     a                 the key "a"
+    #     <f8>              f8
+    #     <cmd>+<f2>        windows key + f2
+    break_key: ''
+
+    # dzi conf
+    # dzi tile size
+    tile_size: 1024
+    tile_size(foraging): 4096
+    tile_size(zombie): 4096
+
+    # make sure map origin (cell 0,0) lies on (0, 0) of a tile
+    # for how many bottom levels (minimum allowed is 1)
+    # default is 3 bottom levels
+    tile_align_levels: 3
+    tile_align_levels(foraging): 1
+    tile_align_levels(zombie): 1
+
+    # how many layers of map to render
+    # examples:
+    # render layer 0 to layer 7
+    #     layer_range: [0, 8]
+    # render layer -32 (basement) to layer 31
+    #     layer_range: [-32, 32]
+    # render all possible layers
+    #     layer_range: all
+    # sous-sols -2..-1 + rez + 8 etages : couvre tout le loot sauf les tours de Louisville
+    layer_range: [-2, 9]
+
+    # hash function for detecting source file changes
+    # if omitted or set to null, last modified time will be used for change detection, which is faster but less accurate
+    # supported hash functions from hashlib: e.g. md5, sha1, sha256, etc.
+    hash_method: null
+
+    # A list of cell ranges to determine the DZI image boundary
+    # Each cell range can be specified in two formats:
+    #     [x_min, y_min, width, height]
+    #     or
+    #     [x, y] (equal to [x, y, 1, 1])
+    #
+    # Special values:
+    #     auto (default): automatically detect the cell range based on current map data, which is the default value.
+    #     all_mod_maps: use the combined cell range of current map and all mod maps
+    #         useful when you want to render save games with mod maps located outside of the vanilla map boundary
+    # Examples:
+    # default B42 map range:
+    #     dzi_cell_range:
+    #         - [0, 18, 45, 45]
+    #         - [45, 3, 13, 60]
+    #         - [58, 0, 20, 63]
+    # emprise vanilla figee : les cartes moddees ont leur propre pyramide,
+    # inutile d'agrandir le canevas de base et de tout re-rendre
+    dzi_cell_range[default]:
+        - [0, 18, 45, 45]
+        - [45, 3, 13, 60]
+        - [58, 0, 20, 63]
+    dzi_cell_range: auto
+
+    # A list of cell ranges to render
+    # Use similar format as dzi_cell_range, but it only affects the final render output, not the DZI pyramid building.
+    # It is used to render a subset of cells from the DZI pyramid built for the whole map.
+    # Special value:
+    #     all (default): render all cells in the DZI pyramid
+    # Examples:
+    # render cells in rect (30, 30) to (50, 50) inclusively for default map
+    #     render_cell_range[default]:
+    #         - [30, 30, 21, 21]
+    # render cell (30, 30) only for default map
+    #     render_cell_range[default]:
+    #         - [30, 30]
+    # it is possible to use different settings for specific maps or render jobs, e.g.:
+    #     render_cell_range[Bedford Falls](zombie):
+    #         - [30, 30, 21, 21]
+    #     render_cell_range[Bedford Falls](save):
+    #         - [30, 30]
+    render_cell_range: all
+
+    # discard bottom levels to save space at the cost of zoom in resolution
+    #
+    # Here is an example:
+    #     render main map with omit_levels = 2
+    #     render other mod maps with omit_levels = 1
+    #     render zombie heatmap and top view zombie heatmap of mod map Bedford Fall with omit_levels = 1
+    #     all other render with omit_levels = 0
+    # Example config:
+    #     omit_levels[default](base): 2
+    #     omit_levels(base): 1
+    #     omit_levels[Bedford Falls](zombie): 1
+    #     omit_levels[Bedford Falls](zombie_top): 1
+    #     omit_levels: 0
+    omit_levels: 0
+
+    # output image format, affect base and all overlay map, mush support transparent
+    # supported formats: [png, webp]
+    image_fmt: webp
+
+    # output image format for base map layer0, can use jpg to save space
+    # supported formats: [png, webp, jpg]
+    image_fmt_base_layer0: jpg
+
+    # output image options for each output format
+    # more options see:
+    #     https://pillow.readthedocs.io/en/stable/handbook/image-file-formats.html#png-saving
+    #
+    # Here is an example:
+    #     use compress level = 1 (fastest) for png
+    #     use 95% quality for jpg
+    # Example config:
+    #     image_save_options:
+    #         png: {compress_level: 1}
+    #         jpg: {quality: 95}
+    image_save_options: {}
+
+    # enable cache to accelerate pyramid building, require python 3.8+
+    enable_cache: false
+    # cache limit in MB, 0 for unlimited
+    cache_limit_mb: 0
+    # width for a single tile in top view
+    top_view_square_size: 2
+
+    # base render
+    plants_conf:
+        # eable snow on trees and bushes
+        snow: false
+        # use large bushes
+        large_bush: false
+        # eable flower on trees and bushes
+        flower: false
+        # supported season: spring, summer, summer2, autumn, winter
+        season: summer2
+        # normal tree size, range from 0 to 3 (inclusive)
+        tree_size: 2
+        # large tree size, range from 0 to 5 (inclusive)
+        jumbo_tree_size: 4
+        # large tree type, from: 1 to 11  (inclusive)
+        # see _TREE_DEF in pzmap2dzi/plants.py for more detail
+        jumbo_tree_type: 1
+        # disable ground cover grass
+        no_ground_cover: false
+        # use only one type of tree
+        # supported values:
+        # 0        trees not unified
+        # 1 to 11   the unified tree type
+        unify_tree_type: 0
+
+    # texture filtering
+    # contains a list of texture name regex patterns that will NOT be used in the render process
+    # example: skip jumbo tree textures
+    #     texture_filters:
+    #         - '.*JUMBO.*'
+    texture_filters: []
+
+    # square color method in top view mode
+    # supported method:
+    # base: only use the color of the floor tile
+    # base+water: only use the color of the floor tile and water tile (if exist)
+    # avg: caculate an average color of all tiles
+    # carto-zed: Carto-Zed like color theme
+    top_view_color_mode: avg
+    
+    # font settings
+    default_font: arial.ttf
+    default_font_size: 20
+    # room font settings, using default font if omitted
+    # room_font: arial.ttf
+    # room_font_size: 20
+
+    # zombie heatmap
+    zombie_count: true
+    # zombie count font settings, using default font if omitted
+    # zombie_count_font: arial.ttf
+    zombie_count_font_size: 40
+
+    # objects areas
+    # objects font settings, using default font if omitted
+    # objects_font: arial.ttf
+    # objects_font_size: 20
+
+    # foraging & objects color config
+    # Possible color value are CSS3-style color specifiers.
+    # For more details, see:
+    #     https://pillow.readthedocs.io/en/stable/reference/ImageColor.html
+    #
+    # If the value doesn't provide alpha, default alpha is set:
+    #     For foraging default alpha = 128 (50%)
+    #     For objects default alpha = 255 (100%)
+    #
+    # To skip render of a type, set color to 'skip'
+    #
+    # Example values:
+    #       red
+    #       '#FF0000'
+    #       '#FF000080'
+    #       'rgba(255, 0, 0, 128)'
+    #       'rgb(255, 0, 0)'
+    #       'hsl(0, 100%, 50%)'
+    #
+    foraging_color_default: Gray
+    foraging_color:
+        Nav:            White
+        TownZone:       Blue
+        TrailerPark:    Cyan
+        Vegitation:     Yellow
+        Forest:         Lime
+        DeepForest:     Green
+        FarmLand:       Magenta
+        Farm:           Red
+        ForagingNav:    White          # B42 Road
+        Water:          DeepSkyBlue    # B42
+        WaterNoFish:    SlateGrey      # B42
+        PHForest:       OrangeRed      # B42.4 Acidic Forest
+        PHMixForest:    Orange         # B42.4 Acidic Mixed Forest
+        PRForest:       ForestGreen    # B42.4 Primary Forest
+        FarmMixForest:  Olive          # B42.4 Farmland Forest
+        FarmForest:     Orange         # B42.4 Managed Forestry
+        BirchForest:    OliveDrab      # B42.4 Birch Forest
+        BirchMixForest: DarkOliveGreen # B42.4 Birch Mixed Forest
+        OrganicForest:  LawnGreen      # B42.4 Organic Forest
+
+    objects_color_default: White
+    objects_color:
+        # Special Zombie Spawn Area
+        ZombiesType:  Red
+        # Car Spawn Area
+        ParkingStall: Blue
+        # Zone Story
+        ZoneStory:    Yellow
+
+    # use mark for room/objects/zombie_count
+    use_mark: true
+
+    # streets color
+    streets_large:  White
+    streets_medium: Cyan
+    streets_small:  Teal
+
+    # save game render
+
+    # the release tag of pzdataspec to use for save game parsing
+    # options are:
+    # - latest: use the latest release version of pzdataspec
+    # - local: use save_game_parser_path to load a local copy of parser
+    save_game_parser_tag: latest
+
+    # when save_game_parser_tag is set to 'local'
+    # save_game_parser_path is the local path to the save game parser
+    # when save_game_parser_tag is set to 'latest'
+    # the downloaded parser will be cached in save_game_parser_path for future use
+    # if left empty, it will default to '<output_path>/lib'
+    save_game_parser_path:
+
+    # dump chunks failed to parse during save game rendering for debugging
+    save_game_dump_failed_chunks: true
