@@ -54,7 +54,7 @@ ICI = os.path.dirname(os.path.realpath(__file__))
 CACHE = os.path.join(ICI, 'vehicules-icones')
 # Le contenu du rendu change si ce code change : le numero entre dans le nom
 # des fichiers en cache.
-VERSION_RENDU = 2
+VERSION_RENDU = 3
 
 DESSUS = 96     # px pour la longueur du vehicule, vue de dessus
 TROIS_QUARTS = 180   # px de large, vue de 3/4
@@ -161,15 +161,34 @@ def index():
                             modeles[e[1]] = bloc
         fichiers = {'models_X': {}, 'textures': {}}
         for racine in reversed(racines):
+            try:
+                presents = os.listdir(racine)
+            except OSError:
+                continue
             for sous in fichiers:
-                base = os.path.join(racine, sous)
-                for dossier, _, noms in os.walk(base):
-                    for n in noms:
-                        rel = os.path.relpath(os.path.join(dossier, n), base)
-                        fichiers[sous][rel.lower().replace('\\', '/')] = os.path.join(dossier, n)
+                # Sans tenir compte de la casse : le mod des semi-remorques
+                # range ses maillages dans models_x, le jeu dans models_X.
+                for d in presents:
+                    if d.lower() != sous.lower():
+                        continue
+                    base = os.path.join(racine, d)
+                    for dossier, _, noms in os.walk(base):
+                        for n in noms:
+                            rel = os.path.relpath(os.path.join(dossier, n), base)
+                            fichiers[sous][rel.lower().replace('\\', '/')] = os.path.join(dossier, n)
         _index = {'vehicules': vehicules, 'gabarits': gabarits, 'modeles': modeles,
                   'fichiers': fichiers}
         return _index
+
+
+def par_nom(table, nom):
+    """Un modele ou un gabarit, nomme seul ou avec son module.
+
+    Les scripts ecrivent l'un ou l'autre : "file = Vehicles_CarNormal" chez le
+    jeu, "file = Rotators.SemiTruckBase" chez le mod des semi-remorques. Les
+    tables sont indexees par le nom seul.
+    """
+    return table.get(nom) or table.get(nom.rsplit('.', 1)[-1])
 
 
 def _chaine_gabarits(bloc, ix, vus=None):
@@ -177,7 +196,7 @@ def _chaine_gabarits(bloc, ix, vus=None):
     vus = vus or set()
     yield bloc
     for nom in bloc[1].get('template!', []) + bloc[1].get('template', []):
-        g = ix['gabarits'].get(nom)
+        g = par_nom(ix['gabarits'], nom)
         if g is not None and nom not in vus:
             vus.add(nom)
             yield from _chaine_gabarits(g, ix, vus)
@@ -218,7 +237,7 @@ def decrire(script):
             etendue = [float(x) for x in b[1]['extents'][-1].split()]
     if not fichier:
         return None
-    modele = ix['modeles'].get(fichier)
+    modele = par_nom(ix['modeles'], fichier)
     if modele is None or 'mesh' not in modele[1]:
         return None
     maillage = modele[1]['mesh'][-1]
@@ -228,7 +247,7 @@ def decrire(script):
     fichier_corps = maillage.partition('|')[0].lower()
     autres = []
     for nom in pieces:
-        m = ix['modeles'].get(nom)
+        m = par_nom(ix['modeles'], nom)
         if m is None or 'mesh' not in m[1]:
             continue
         mesh = m[1]['mesh'][-1]
