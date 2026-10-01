@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#14161a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="pwa/icone-192.png">
-<link rel="stylesheet" href="carte/style.css?v=22">
+<link rel="stylesheet" href="carte/style.css?v=23">
 </head>
 <body>
 
@@ -20,6 +20,7 @@
   <canvas id="trace"></canvas>
   <div id="marqueurs"></div>
   <canvas id="radio"></canvas>
+  <div id="vehiculesCalque"></div>
   <div id="bases"></div>
   <div id="joueurCalque"></div>
 </div>
@@ -175,6 +176,23 @@
       </details>
     </div>
 
+    <div class="bloc" id="blocVehicules">
+      <label class="case-calque" style="margin-top:0">
+        <input type="checkbox" id="calqueVehicules" checked> vehicules autour de moi
+        <i class="nb" id="nbVehicules"></i>
+      </label>
+      <label class="case-calque">
+        <input type="checkbox" id="calqueVehiculesVus" checked> vehicules deja vus
+        <i class="nb" id="nbVehiculesVus"></i>
+      </label>
+      <label class="case-calque">
+        <input type="checkbox" id="calqueVehiculesAmorce" checked> vehicules de la sauvegarde
+        <i class="nb" id="nbVehiculesAmorce"></i>
+      </label>
+      <div class="aide" id="etatVehicules"></div>
+      <div id="listeVehicules"></div>
+    </div>
+
     <div class="bloc" id="blocRadio">
       <label class="case-calque" style="margin-top:0">
         <input type="checkbox" id="calqueRadio"> portee des talkies-walkies
@@ -216,6 +234,6 @@
   </section>
 </div>
 
-<script type="module" src="carte/app.js?v=44"></script>
+<script type="module" src="carte/app.js?v=45"></script>
 </body>
 </html>

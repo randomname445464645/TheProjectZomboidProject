@@ -314,6 +314,59 @@ jar, il faut relancer Project Zomboid. Le jar se remplace par renommage
 (`mv`), jamais en réécrivant le fichier : le jeu en cours garde l'ancien ouvert
 et continue sans erreur.
 
+## Les véhicules
+
+Un troisième thread, `pz-export-vehicules`, relève toutes les 5 s les
+véhicules de la **zone chargée** autour de toi (`IsoCell.getVehicles()`) :
+ceux que ton client simule, donc ceux qui sont près de toi. Un véhicule hors
+de cette zone n'existe pas pour le client.
+
+Il écrit deux choses à côté de `position.json` :
+
+- `vehicules.json` : les véhicules présents maintenant, réécrit à chaque
+  relevé (`.tmp` puis renommage atomique) ;
+- `vehicules/AAAA-MM-JJ.ndjson` : le journal, une ligne par **événement** et
+  pas par relevé. `a` apparition (fiche complète), `m` modification de
+  l'essence, de l'état, des verrous ou des clés (fiche complète), `d`
+  déplacement de 3 cases ou plus, `p` toujours là (une fois par 10 min), `f`
+  sorti de la zone (absent 3 relevés de suite). Chaque ligne porte l'heure
+  réelle `t` et l'heure du monde de jeu `h`. Sous-dossier, comme `traces/` :
+  `convertir.py` ne le lit pas.
+
+Mesuré en simulation, 3 véhicules pendant une heure : 45 lignes. Un véhicule
+que tu conduis écrit une ligne `d` courte par relevé.
+
+**La fiche** (`Vehicules.java`) : modèle (`getScriptName`), nom traduit comme
+le fait l'écran de mécanique du jeu (`IGUI_VehicleName` + `carModelName`),
+couleur (teinte, saturation, valeur), état moyen des pièces posées, moteur
+(état, qualité, puissance), essence et capacité du réservoir, batterie, pneus
+posés, nombre d'objets dans les conteneurs **reçus par ton client**,
+verrouillage des portes et du coffre, clé sur le contact, sur la portière,
+démarré aux fils, **clé dans ton inventaire** (`haveThisKeyId`), alarme,
+moteur qui tourne, vitesse, conducteur, remorque.
+
+**L'identifiant** est `keyId` : tiré au hasard à la création du véhicule,
+sauvegardé avec lui et partagé avec sa clé, il est le même d'une session à
+l'autre. L'id réseau change à chaque chargement et `sqlId` est l'index de la
+base locale du client. Sans `keyId`, repli sur l'id réseau (`n<id>`), valable
+pour la session seulement.
+
+Option : `vehicules=<s>`, défaut 5, `0` pour ne rien relever. `journal=0`
+coupe aussi le journal des véhicules.
+
+Le serveur de la carte agrège le journal (`out/html/vehicules.py`) : pour
+chaque véhicule, première et dernière fois vu, nombre de passages (revu après
+plus de 15 min d'absence), endroits distincts où il a été vu. Il ajoute les
+véhicules de `vehicles.db`, la base que le client tient dans la sauvegarde
+multijoueur : position et modèle seulement, le reste du blob est la
+sérialisation Java du véhicule. Cette base n'est pas mise à jour en continu
+par le jeu.
+
+Pas de chargement à chaud : `JVMTI.agent_load` sur un jeu qui a déjà l'agent
+retrouverait l'ancienne classe `pzexport.Agent` (même chargeur de classes) et
+doublerait tous ses threads. De plus `jcmd` prend un `cle=valeur` en argument
+pour une option à lui et ne le transmet pas à l'agent. Relancer le jeu.
+
 ## Limites
 
 L'agent ne voit que la **zone chargée** autour de toi, bornée par

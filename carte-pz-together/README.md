@@ -1,9 +1,10 @@
 # Carte PZ together
 
 Carte web locale du serveur Project Zomboid **PZ together** (build 42.20.4),
-avec 1860 points de loot. Tout est statique : aucun acces aux sauvegardes du
-jeu, aucune ecriture dans `~/Zomboid`, aucune dependance externe, marche hors
-ligne.
+avec 1860 points de loot. Aucune ecriture dans `~/Zomboid`, aucune dependance
+externe, marche hors ligne. Seules lectures cote jeu : ce que l'agent exporte
+dans `~/Zomboid/pz-export`, et `vehicles.db` de la sauvegarde, en lecture seule
+(calque des vehicules).
 
 Le rendu des tuiles est fait par [pzmap2dzi](https://github.com/cff29546/pzmap2dzi)
 (inclus ici avec deux correctifs, voir plus bas). Le viewer, lui, est ecrit pour
@@ -68,8 +69,9 @@ quoi qu'il arrive. Restreindre l'emprise ne fait donc pas gagner de temps.
 
 ```
 out/html/carte.html        page
-out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, app.js
+out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, vehicules.js, app.js
 out/html/serveur.py        serveur statique, bibliotheque standard seule
+out/html/vehicules.py      vehicules : releve en direct, journal agrege, vehicles.db
 out/html/icons/            10 sprites extraits de UI2.pack
 out/html/markers.json      1860 marqueurs
 pzmap2dzi/                 l'outil de rendu, avec les correctifs
@@ -190,6 +192,28 @@ milieu de la vue. Les portees viennent de `TransmitRange` dans
 Lu dans `zombie.radio.ZomboidRadio` : la distance est euclidienne, c'est la
 portee de l'emetteur qui compte, et au-dela de 90 % le message arrive brouille
 (cercle en pointilles).
+
+## Vehicules
+
+Onglet Calques, bloc "vehicules" : un carre par vehicule, de sa couleur dans
+le jeu. Un clic ouvre sa fiche : modele, etat, moteur, essence, batterie,
+pneus, cles (dont "tu as la cle"), verrous, contenu, et quand il a ete vu la
+premiere et la derniere fois, en heure reelle et en heure du jeu.
+
+| Carre | Source |
+|---|---|
+| plein | la, maintenant : releve de l'agent toutes les 5 s, zone chargee autour de toi |
+| creux | vu par l'agent, sorti de ta zone depuis : position et etat de ce moment-la |
+| pointille gris | `vehicles.db` de la sauvegarde du client : modele et position seulement |
+
+La liste sous les cases donne les plus proches, un clic centre la carte et
+ouvre la fiche. Releve et journal : voir `outils/agent-monde/LISEZMOI.md`,
+section vehicules. Il faut l'agent reconstruit et le jeu relance.
+
+Le serveur sert `GET /api/vehicules` (en direct) et
+`GET /api/vehicules?connus=1` (journal agrege et `vehicles.db`), en-tete
+`X-Carte: vehicules`. La sauvegarde lue est la plus recemment jouee de
+`~/Zomboid/Saves/Multiplayer`, ou celle de `PZCARTE_SAUVEGARDE`.
 
 ## Notes
 

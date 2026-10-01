@@ -10,6 +10,10 @@ La carte est statique a deux exceptions pres :
     (~/Zomboid/pz-export/traces/AAAA-MM-JJ.ndjson), et
     GET /api/traces?jour=AAAA-MM-JJ renvoie les points d'un jour. Lecture
     seule.
+  - GET /api/vehicules renvoie les vehicules que l'agent voit autour du
+    joueur (~/Zomboid/pz-export/vehicules.json), et
+    GET /api/vehicules?connus=1 tous ceux qu'il a deja vus, tires de son
+    journal, plus ceux de vehicles.db. Lecture seule, voir vehicules.py.
 
 Rien d'autre n'a besoin de flask ni de waitress, la bibliotheque standard
 suffit.
@@ -26,6 +30,8 @@ import sys
 import threading
 import time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+import vehicules
 
 # Reglables pour lancer une instance de test a cote de la vraie, sans
 # toucher a la position que l'agent du jeu ecrit.
@@ -207,6 +213,13 @@ class Handler(SimpleHTTPRequestHandler):
             q = parse_qs(urlsplit(self.path).query)
             jour = (q.get('jour') or [None])[0]
             self.repondre_json(*(lire_jour(jour) if jour else lister_jours()))
+            return
+        if self.path.split('?', 1)[0] == '/api/vehicules':
+            if self.headers.get('X-Carte') != 'vehicules':
+                self.send_error(403, 'en-tete X-Carte manquant')
+                return
+            connus = 'connus=1' in self.path.split('?', 1)[-1]
+            self.repondre_json(*(vehicules.lire_connus() if connus else vehicules.lire_direct()))
             return
         if self.path.split('?', 1)[0] == '/api/position':
             # Meme garde que /api/sync : sans l'en-tete, une page d'une autre

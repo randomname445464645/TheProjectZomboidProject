@@ -53,6 +53,8 @@ import zombie.util.list.PZArrayList;
  *                          defaut 1000, 0 pour ne pas l'ecrire
  *     journal=0            n'enregistre pas les deplacements (voir Journal) ;
  *                          par defaut ils sont notes dans traces/AAAA-MM-JJ.ndjson
+ *     vehicules=<s>        intervalle de releve des vehicules, defaut 5, 0 pour
+ *                          ne pas les relever (voir Vehicules, JournalVehicules)
  *
  * POSITION DU JOUEUR
  *     Un second thread ecrit position.json a cote du fichier de sortie :
@@ -64,6 +66,12 @@ import zombie.util.list.PZArrayList;
  *     secondes sur une grande zone chargee ; la position, elle, doit suivre.
  *     L'extension .json et non .ndjson est voulue : convertir.py lit tous les
  *     .ndjson du dossier et ne doit pas prendre la position pour un releve.
+ *
+ * VEHICULES
+ *     Un troisieme thread releve les vehicules de la zone chargee et ecrit
+ *     vehicules.json (ceux qui sont la maintenant, meme ecriture atomique) et
+ *     un journal par jour dans vehicules/AAAA-MM-JJ.ndjson. Sous-dossier, pour
+ *     la meme raison que traces/ : convertir.py ne le lit pas.
  */
 public final class Agent {
 
@@ -75,6 +83,7 @@ public final class Agent {
     private static boolean tout = false;
     private static long periodePositionMs = 1000L;
     private static boolean journalActif = true;
+    private static long periodeVehiculesMs = 5000L;
 
     // Signature de la derniere version vue de chaque case, pour n'ecrire que
     // ce qui a change. Cle = (x, y, z) empaquetes, valeur = hachage du contenu.
@@ -89,6 +98,12 @@ public final class Agent {
 
     private static void demarrer(String args) {
         lireOptions(args);
+        if (periodeVehiculesMs > 0) {
+            Thread v = new Thread(Agent::boucleVehicules, "pz-export-vehicules");
+            v.setDaemon(true);
+            v.setPriority(Thread.MIN_PRIORITY);
+            v.start();
+        }
         Thread t = new Thread(Agent::boucle, "pz-export");
         t.setDaemon(true);                 // ne retient jamais l'arret du jeu
         t.setPriority(Thread.MIN_PRIORITY);
@@ -101,7 +116,7 @@ public final class Agent {
         }
         System.out.println("[pz-export] agent actif, sortie=" + sortie
                 + " periode=" + (periodeMs / 1000) + "s tout=" + tout
-                + " position=" + periodePositionMs + "ms");
+                + " position=" + periodePositionMs + "ms vehicules=" + periodeVehiculesMs + "ms");
     }
 
     private static void lireOptions(String args) {
@@ -122,6 +137,10 @@ public final class Agent {
                     try { periodePositionMs = Math.max(0L, Long.parseLong(val)); }
                     catch (NumberFormatException ignore) { }
                     if (periodePositionMs > 0 && periodePositionMs < 200) periodePositionMs = 200;
+                }
+                case "vehicules" -> {
+                    try { periodeVehiculesMs = Math.max(0L, Long.parseLong(val) * 1000L); }
+                    catch (NumberFormatException ignore) { }
                 }
                 case "tout"   -> tout = "1".equals(val) || "true".equalsIgnoreCase(val);
             }
@@ -306,6 +325,58 @@ public final class Agent {
                 // erreur persistante noierait la console du jeu.
                 if (erreurs++ % 60 == 0) {
                     System.out.println("[pz-export] position ignoree : " + e);
+                }
+            }
+        }
+    }
+
+    /**
+     * Releve des vehicules : vehicules.json pour la carte en direct, et le
+     * journal des passages. Meme regles que la position : thread a part, rien
+     * ne remonte au jeu, une erreur par minute au plus dans la console.
+     */
+    private static void boucleVehicules() {
+        Path fin = Paths.get(sortie).resolveSibling("vehicules.json");
+        Path tmp = Paths.get(sortie).resolveSibling("vehicules.json.tmp");
+        JournalVehicules journal = journalActif
+                ? new JournalVehicules(Paths.get(sortie).resolveSibling("vehicules"), ZoneId.systemDefault())
+                : null;
+        int erreurs = 0, erreursJournal = 0;
+        while (true) {
+            try {
+                Thread.sleep(periodeVehiculesMs);
+                IsoPlayer j = IsoPlayer.getInstance();
+                if (j == null) continue;            // menu, chargement
+                long t = System.currentTimeMillis();
+                String h = Vehicules.heureJeu();
+                List<Vehicules.Releve> l = Vehicules.lire(j);
+                StringBuilder sb = new StringBuilder(256 + 600 * l.size());
+                sb.append(String.format(Locale.ROOT,
+                        "{\"t\":%d,\"h\":%s,\"hm\":%.2f,\"jx\":%.1f,\"jy\":%.1f,\"liste\":[",
+                        t, chaine(h), Vehicules.heuresMonde(), j.getX(), j.getY()));
+                for (int i = 0; i < l.size(); i++) {
+                    if (i > 0) sb.append(',');
+                    sb.append(l.get(i).json());
+                }
+                sb.append("]}");
+                Files.writeString(tmp, sb.toString(), StandardCharsets.UTF_8);
+                Files.move(tmp, fin, StandardCopyOption.REPLACE_EXISTING,
+                        StandardCopyOption.ATOMIC_MOVE);
+                erreurs = 0;
+                if (journal != null) {
+                    try {
+                        journal.noter(l, t, h);
+                    } catch (Throwable e) {
+                        if (erreursJournal++ % 12 == 0) {
+                            System.out.println("[pz-export] journal vehicules ignore : " + e);
+                        }
+                    }
+                }
+            } catch (InterruptedException e) {
+                return;
+            } catch (Throwable e) {
+                if (erreurs++ % 12 == 0) {
+                    System.out.println("[pz-export] vehicules ignores : " + e);
                 }
             }
         }

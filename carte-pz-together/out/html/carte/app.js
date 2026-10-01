@@ -19,6 +19,7 @@ import * as joueur from './joueur.js';
 import * as histo from './historique.js';
 import { initRues, basculerRues, dessinerRues } from './rues.js';
 import * as radio from './radio.js';
+import * as vehicules from './vehicules.js';
 import * as loot from './loot.js';
 import { exporterVue } from './exporter.js';
 import { initConstructions, basculerConstructions, dessinerConstructions,
@@ -66,6 +67,7 @@ function rendre() {
   histo.dessinerHistorique();
   trajet.dessinerItineraire();
   dessinerMarqueurs();
+  vehicules.dessinerVehicules();
   bases.dessinerBases();
   joueur.dessinerJoueur();
   majHud();
@@ -1386,6 +1388,57 @@ function initRadioPanneau() {
   majCentresRadio();
 }
 
+// --- vehicules ---------------------------------------------------------------
+
+const LISTE_VEHICULES_MAX = 15;
+
+function majVehiculesUI() {
+  const n = vehicules.nombres();
+  $('nbVehicules').textContent = n.presents ? String(n.presents) : '';
+  $('nbVehiculesVus').textContent = n.vus ? String(n.vus) : '';
+  $('nbVehiculesAmorce').textContent = n.amorce ? String(n.amorce) : '';
+  $('etatVehicules').textContent = vehicules.texteEtat();
+
+  // Les plus proches, pour retrouver une voiture sans chercher le carre.
+  const hote = $('listeVehicules');
+  hote.textContent = '';
+  if (!vehicules.etat.actif) return;
+  for (const v of vehicules.presents().slice(0, LISTE_VEHICULES_MAX)) {
+    const l = document.createElement('div');
+    l.className = 'ligne-vh';
+    l.innerHTML = '<i></i><span></span><em></em>';
+    l.querySelector('i').style.background = vehicules.couleur(v.c);
+    l.querySelector('span').textContent = v.n || v.s || 'vehicule';
+    const bouts = [v.distance + ' cases'];
+    if (v.reservoir > 0) bouts.push(Math.round(v.essence / v.reservoir * 100) + ' % ess.');
+    if (v.macle || v.contact || v.porte) bouts.push('cle');
+    l.querySelector('em').textContent = bouts.join(' · ');
+    l.addEventListener('click', () => {
+      if (joueur.etat.suivre) joueur.basculerSuivi(false);
+      centrerSur(v.x, v.y, Math.max(vue.zoom, 2));
+      vehicules.ouvrirFiche(v.k);
+      demanderRendu();
+    });
+    hote.appendChild(l);
+  }
+  vehicules.majFiche();
+}
+
+function initVehiculesPanneau() {
+  vehicules.initVehicules($('vehiculesCalque'), majVehiculesUI, () => demanderRendu());
+  const cases = [['calqueVehicules', 'actif'], ['calqueVehiculesVus', 'anciens'],
+                 ['calqueVehiculesAmorce', 'amorce']];
+  for (const [id, cle] of cases) {
+    $(id).checked = vehicules.etat[cle];
+    $(id).addEventListener('change', function () {
+      vehicules.etat[cle] = this.checked;
+      vehicules.enregistrer();
+      majVehiculesUI();
+      demanderRendu();
+    });
+  }
+}
+
 // --- clic sur la carte -----------------------------------------------------
 
 function clicCarte(e) {
@@ -1446,6 +1499,7 @@ async function demarrer() {
   initJoueurPanneau();
   initTracesPanneau();
   initRadioPanneau();
+  initVehiculesPanneau();
   allerOnglet = initOnglets();
   // Les deux panneaux ne sont rafraichis qu'a l'ouverture de leur onglet :
   // sans ce premier passage, le compteur de bases reste vide tant qu'on n'y

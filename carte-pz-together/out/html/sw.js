@@ -10,7 +10,7 @@
 // s'ouvrir instantanement et de fonctionner meme si le serveur local n'a pas
 // encore demarre.
 
-const VERSION = 'carte-pz-v6';   // v6 : calque radio
+const VERSION = 'carte-pz-v7';   // v7 : vehicules
 
 // Chemins de la coquille. Les parametres ?v= des balises sont conserves tels
 // quels : c'est l'URL complete qui sert de cle de cache.
@@ -23,6 +23,7 @@ const COQUILLE = [
   '/carte/marqueurs.js',
   '/carte/rues.js',
   '/carte/radio.js',
+  '/carte/vehicules.js',
   '/carte/loot.js',
   '/carte/loot-table.js',
   '/carte/exporter.js',
