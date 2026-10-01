@@ -36,7 +36,7 @@ html, body {
 body.replie #carte { inset: 0; }
 #carte.glisse { cursor: grabbing; }
 
-#plan, #rues, #historique, #trace, #marqueurs, #bases, #joueurCalque {
+#plan, #rues, #radio, #historique, #trace, #marqueurs, #bases, #joueurCalque {
   position: absolute;
   left: 0; top: 0;
   width: 100%; height: 100%;
@@ -49,6 +49,9 @@ body.replie #carte { inset: 0; }
    cliquables a travers. */
 #rues   { z-index: 2; pointer-events: none; }
 #marqueurs { z-index: 3; pointer-events: none; }
+/* Au-dessus des pastilles, sinon elles mangent les etiquettes des cercles :
+   meme z-index que #marqueurs, mais place apres lui dans le DOM. */
+#radio  { z-index: 3; pointer-events: none; }
 #historique { z-index: 4; pointer-events: none; }
 #trace  { z-index: 5; pointer-events: none; }
 #bases  { z-index: 6; pointer-events: none; }
@@ -700,3 +703,16 @@ body.replie #suivre { right: 8px; }
 #blocJoueurs summary { cursor: pointer; font-size: 12px; color: var(--faible); padding: 3px 0; }
 #blocJoueurs summary:hover { color: var(--texte); }
 #listeJoueurs { max-height: 260px; overflow: auto; }
+
+/* Portees radio : une case par modele, pastille de la couleur du cercle. */
+#radioModeles { margin-top: 6px; }
+#radioModeles label {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 4px; font-size: 12px; color: var(--faible); cursor: pointer;
+}
+#radioModeles i {
+  width: 10px; height: 10px; border-radius: 50%;
+  border: 2px solid; flex: none;
+}
+#radioModeles .portee { margin-left: auto; font-style: normal; font-size: 11px; }
+#radioModeles .sep { margin-top: 8px; font-size: 11px; color: var(--faible); opacity: .7; }

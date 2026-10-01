@@ -89,6 +89,9 @@ export function enDirect() {
 
 export function moi() { return etat.joueurs.get(MOI) || null; }
 
+/** Ta position interpolee, celle de la pastille a l'ecran. */
+export function positionMoi() { return positionCourante(moi()); }
+
 /**
  * Oublie les autres joueurs vus il y a plus de OUBLI secondes, selon
  * l'HORLOGE, pas selon les lectures : jeu ferme, plus aucune lecture

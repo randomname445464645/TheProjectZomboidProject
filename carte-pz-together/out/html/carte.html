@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#14161a">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <link rel="apple-touch-icon" href="pwa/icone-192.png">
-<link rel="stylesheet" href="carte/style.css?v=21">
+<link rel="stylesheet" href="carte/style.css?v=22">
 </head>
 <body>
 
@@ -19,6 +19,7 @@
   <canvas id="historique"></canvas>
   <canvas id="trace"></canvas>
   <div id="marqueurs"></div>
+  <canvas id="radio"></canvas>
   <div id="bases"></div>
   <div id="joueurCalque"></div>
 </div>
@@ -174,6 +175,21 @@
       </details>
     </div>
 
+    <div class="bloc" id="blocRadio">
+      <label class="case-calque" style="margin-top:0">
+        <input type="checkbox" id="calqueRadio"> portee des talkies-walkies
+      </label>
+      <div class="ligne-boutons">
+        <select id="radioCentre" title="Centre des cercles"></select>
+        <button id="radioEpingler" title="Epingler le centre des cercles au milieu de la vue">epingler ici</button>
+        <button id="radioCadrer" title="Cadrer sur le plus grand cercle">cadrer</button>
+      </div>
+      <div id="radioModeles"></div>
+      <p class="aide">Portees du jeu (TransmitRange). C'est la portee de
+        l'emetteur : l'autre t'entend s'il est dans TON cercle. Au-dela du
+        pointille (90 %), le message arrive brouille.</p>
+    </div>
+
     <div class="bloc" id="blocLoot">
       <div class="ligne-loot">
         <span class="etiquette">repop</span>
@@ -200,6 +216,6 @@
   </section>
 </div>
 
-<script type="module" src="carte/app.js?v=43"></script>
+<script type="module" src="carte/app.js?v=44"></script>
 </body>
 </html>

@@ -68,7 +68,7 @@ quoi qu'il arrive. Restreindre l'emprise ne fait donc pas gagner de temps.
 
 ```
 out/html/carte.html        page
-out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, app.js
+out/html/carte/            style.css, geometrie.js, vue.js, marqueurs.js, rues.js, radio.js, app.js
 out/html/serveur.py        serveur statique, bibliotheque standard seule
 out/html/icons/            10 sprites extraits de UI2.pack
 out/html/markers.json      1860 marqueurs
@@ -168,6 +168,28 @@ le Slugger.
 
 Raven Creek, Constown, New Hartburg, Chestown et LQZ n'ont aucun marqueur :
 l'extraction est anterieure a l'ajout de ces cinq cartes.
+
+## Portees radio
+
+Onglet Calques, case "portee des talkies-walkies" : un cercle par modele coche,
+centre sur ta position en direct, sur une base, ou sur un point epingle au
+milieu de la vue. Les portees viennent de `TransmitRange` dans
+`media/scripts/generated/items/radio.txt` (build 42) :
+
+| Modele | Portee (cases) |
+|---|---|
+| Talkie-Walkie Toys-R-Mine | 750 |
+| Talkie-Walkie artisanal | 1 000 |
+| Talkie-Walkie ValuTech | 2 000 |
+| Talkie-Walkie Premium Technologies | 4 000 |
+| Talkie-Walkie tactique | 8 000 |
+| Talkie-Walkie de l'Armee americaine | 16 000 |
+| Poste radio nomade militaire | 20 000 |
+| Radioamateur artisanale / Premium / militaire | 6 000 / 7 500 / 20 000 |
+
+Lu dans `zombie.radio.ZomboidRadio` : la distance est euclidienne, c'est la
+portee de l'emetteur qui compte, et au-dela de 90 % le message arrive brouille
+(cercle en pointilles).
 
 ## Notes
 

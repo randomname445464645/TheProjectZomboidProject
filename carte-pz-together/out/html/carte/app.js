@@ -18,6 +18,7 @@ import * as trajet from './itineraire.js';
 import * as joueur from './joueur.js';
 import * as histo from './historique.js';
 import { initRues, basculerRues, dessinerRues } from './rues.js';
+import * as radio from './radio.js';
 import * as loot from './loot.js';
 import { exporterVue } from './exporter.js';
 import { initConstructions, basculerConstructions, dessinerConstructions,
@@ -61,6 +62,7 @@ function demanderRendu(majListeAussi = false) {
 function rendre() {
   dessinerTuiles();
   dessinerRues();
+  radio.dessinerRadio();
   histo.dessinerHistorique();
   trajet.dessinerItineraire();
   dessinerMarqueurs();
@@ -1298,6 +1300,92 @@ function initTracesPanneau() {
   if (epingle) ouvrirTraces();
 }
 
+// --- portees radio -------------------------------------------------------
+
+function centreRadio(cle) {
+  if (cle === 'moi') {
+    const p = joueur.positionMoi();
+    return p ? { ...p, nom: 'toi' } : null;
+  }
+  if (cle === 'epingle') return radio.etat.epingle;
+  const b = bases.trouver(cle);
+  return b ? { x: b.x, y: b.y, nom: b.nom } : null;
+}
+
+/** Le menu des centres suit la liste des bases : il est refait a chaque fois. */
+function majCentresRadio() {
+  const sel = $('radioCentre');
+  const options = [['moi', 'centre : ma position']];
+  if (radio.etat.epingle) {
+    options.push(['epingle', `centre : point epingle (${radio.etat.epingle.x}, ${radio.etat.epingle.y})`]);
+  }
+  for (const b of bases.etat.liste) options.push([b.id, 'centre : base ' + b.nom]);
+  if (!options.some(o => o[0] === radio.etat.centre)) radio.etat.centre = 'moi';
+  sel.innerHTML = '';
+  for (const [v, t] of options) {
+    const o = document.createElement('option');
+    o.value = v; o.textContent = t;
+    sel.appendChild(o);
+  }
+  sel.value = radio.etat.centre;
+}
+
+function initRadioPanneau() {
+  radio.initRadio($('radio'), centreRadio);
+  $('calqueRadio').checked = radio.etat.actif;
+  const hote = $('radioModeles');
+  let posteVu = false;
+  for (const m of radio.MODELES) {
+    if (m.poste && !posteVu) {
+      posteVu = true;
+      hote.insertAdjacentHTML('beforeend', '<div class="sep">postes radio</div>');
+    }
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox"><i></i><span></span><em class="portee"></em>`;
+    const c = l.querySelector('input');
+    c.checked = radio.etat.modeles.has(m.id);
+    l.querySelector('i').style.borderColor = m.couleur;
+    l.querySelector('span').textContent = m.nom + (m.fixe ? ' (fixe)' : '');
+    l.querySelector('em').textContent = m.portee.toLocaleString('fr-FR');
+    l.title = m.id;
+    c.addEventListener('change', () => {
+      if (c.checked) radio.etat.modeles.add(m.id); else radio.etat.modeles.delete(m.id);
+      // Cocher un modele, c'est vouloir le voir : le calque s'allume avec.
+      if (c.checked && !radio.etat.actif) { radio.etat.actif = true; $('calqueRadio').checked = true; }
+      radio.enregistrer();
+      demanderRendu();
+    });
+    hote.appendChild(l);
+  }
+  $('calqueRadio').addEventListener('change', function () {
+    radio.etat.actif = this.checked;
+    radio.enregistrer();
+    demanderRendu();
+  });
+  $('radioCentre').addEventListener('change', function () {
+    radio.etat.centre = this.value;
+    radio.enregistrer();
+    demanderRendu();
+  });
+  $('radioEpingler').addEventListener('click', () => {
+    const c = centreMonde();
+    radio.etat.epingle = { x: Math.round(c.x), y: Math.round(c.y) };
+    radio.etat.centre = 'epingle';
+    radio.etat.actif = true;
+    $('calqueRadio').checked = true;
+    radio.enregistrer();
+    majCentresRadio();
+    demanderRendu();
+  });
+  $('radioCadrer').addEventListener('click', () => {
+    const c = radio.centre(), r = radio.porteeMax();
+    if (!c || !r) return;
+    cadrerSur(c.x - r, c.y - r, c.x + r, c.y + r);
+    demanderRendu(true);
+  });
+  majCentresRadio();
+}
+
 // --- clic sur la carte -----------------------------------------------------
 
 function clicCarte(e) {
@@ -1325,7 +1413,7 @@ async function demarrer() {
   // majConsigne dans les deux rappels : le mode peut changer autrement que
   // par le bouton (Echap, une base posee, un depart choisi depuis une fiche),
   // et la consigne flottante doit suivre dans tous les cas.
-  bases.initBases($('bases'), () => { majPanneauBases(); majConsigne(); demanderRendu(); });
+  bases.initBases($('bases'), () => { majPanneauBases(); majConsigne(); majCentresRadio(); demanderRendu(); });
   trajet.initItineraire($('trace'), () => { majPanneauTrajet(); majConsigne(); demanderRendu(); });
   mesurer();
 
@@ -1357,6 +1445,7 @@ async function demarrer() {
   initTrajetPanneau();
   initJoueurPanneau();
   initTracesPanneau();
+  initRadioPanneau();
   allerOnglet = initOnglets();
   // Les deux panneaux ne sont rafraichis qu'a l'ouverture de leur onglet :
   // sans ce premier passage, le compteur de bases reste vide tant qu'on n'y
