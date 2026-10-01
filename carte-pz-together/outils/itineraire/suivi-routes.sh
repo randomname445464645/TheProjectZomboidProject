@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Suivi en direct de construire-grille.py. Lecture seule : Ctrl+C sort du
+# Suivi en direct de construire-routes.py. Lecture seule : Ctrl+C sort du
 # suivi, pas du travail.
 #
 # Source unique : le nombre de lignes du journal. Une ligne par cellule finie.
 # Aucun parcours d'arborescence, aucune relecture des PNG.
 set -u
 
-JOURNAL="${1:-out/html/map_data/itineraire/construction.log}"
+JOURNAL="${1:-out/html/map_data/routes/construction.log}"
 PERIODE=2
 
 [ -f "$JOURNAL" ] || { echo "journal introuvable : $JOURNAL"; exit 1; }
@@ -15,7 +15,7 @@ PERIODE=2
 # pgrep -f sur un motif qui apparait dans sa propre ligne de commande se
 # trouve lui-meme.
 pid_constructeur() {
-  pgrep -f 'construire-grille\.py' | head -1
+  pgrep -f 'construire-routes\.py' | head -1
 }
 
 total=$(head -1 "$JOURNAL" | awk '{print $2}')
@@ -78,14 +78,14 @@ while :; do
   fi
 
   clear
-  printf 'Grille de cout pour l itineraire auto\n'
+  printf 'Reseau routier du GPS\n'
   printf '%s\n\n' '-------------------------------------'
   printf '  [%s] %s %%\n' "$(barre "$frac" 46)" "$pct"
   printf '  %d / %d cellules de carte\n\n' "$n" "$total"
   printf '  La barre ne couvre QUE la lecture des cellules.\n'
-  printf '  L ecriture des PNG vient apres, une fois par carte, et ne compte pas.\n\n'
+  printf '  Les zones urbaines et l ecriture des PNG viennent apres (quelques secondes).\n\n'
   printf '  cadence instantanee : %s\n' "$INST_TXT"
-  printf '  moyenne depuis le debut : %s cell/s (stable tout de suite)\n' "$moyenne"
+  printf '  moyenne depuis le lancement du suivi : %s cell/s (stable tout de suite)\n' "$moyenne"
   printf '  ecoule : %s\n' "$(duree "$ecoule")"
   printf '  restant : %s\n\n' "$reste_txt"
   printf '  etat : %s\n\n' "$etat"

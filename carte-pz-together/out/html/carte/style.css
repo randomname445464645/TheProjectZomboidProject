@@ -772,3 +772,14 @@ body.replie #suivre { right: 8px; }
 #listeVehicules .ligne-vh i { width: 10px; height: 10px; border-radius: 2px; flex: none; border: 1px solid rgba(0,0,0,.8); }
 #listeVehicules .ligne-vh span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #listeVehicules .ligne-vh em { font-style: normal; font-size: 11px; color: var(--faible); white-space: nowrap; }
+
+/* Trajet : villes evitees et routes dessinees */
+#blocVilles summary, #blocRoutes summary { cursor: pointer; font-weight: 600; }
+#blocVilles .nb, #blocRoutes .nb { font-weight: 400; color: var(--faible); font-size: 11px; margin-left: 4px; }
+#listeVilles { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 10px; margin-top: 8px; font-size: 12px; }
+#listeVilles label { display: flex; align-items: center; gap: 5px; }
+#listeRoutes .etape .rang { background: #9be37a; color: #111; }
+#nomRoute { flex: 1 1 100%; min-width: 0; }
+.ligne-boutons[hidden] { display: none; }
+#ligneGuidage[hidden] { display: none; }
+#ligneGuidage { margin-top: 10px; }
