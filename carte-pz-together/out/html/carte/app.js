@@ -1753,6 +1753,15 @@ function initVehiculesPanneau() {
       demanderRendu();
     });
   }
+  // Interrupteur general dans Carte > Calques : masque toutes les voitures
+  // sans toucher aux reglages fins de l'onglet Joueurs > Vehicules.
+  $('calqueVehiculesCarte').checked = vehicules.etat.visible;
+  $('calqueVehiculesCarte').addEventListener('change', function () {
+    vehicules.etat.visible = this.checked;
+    vehicules.enregistrer();
+    if (!this.checked) vehicules.fermerFiche();
+    demanderRendu();
+  });
 }
 
 // --- clic sur la carte -----------------------------------------------------

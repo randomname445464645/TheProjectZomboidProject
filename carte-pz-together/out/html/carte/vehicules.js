@@ -31,6 +31,7 @@ const PERIME = 20;              // s : au-dela, le releve n'est plus "en direct"
 const CLE = 'pzcarte.vehicules';
 
 export const etat = {
+  visible: true,        // interrupteur general (Carte > Calques), au-dessus des deux suivants
   actif: true,          // carres des vehicules presents
   anciens: true,        // carres des vehicules deja vus
   direct: null,         // dernier releve {t, h, hm, jx, jy, liste}
@@ -53,6 +54,7 @@ export function initVehicules(element, auChangement, demanderRendu) {
   try {
     const d = JSON.parse(localStorage.getItem(CLE) || 'null');
     if (d) {
+      etat.visible = d.visible !== false;
       etat.actif = d.actif !== false;
       etat.anciens = d.anciens !== false;
     }
@@ -68,7 +70,7 @@ export function initVehicules(element, auChangement, demanderRendu) {
 export function enregistrer() {
   try {
     localStorage.setItem(CLE, JSON.stringify({
-      actif: etat.actif, anciens: etat.anciens,
+      visible: etat.visible, actif: etat.actif, anciens: etat.anciens,
     }));
   } catch (e) {}
 }
@@ -231,6 +233,7 @@ export function presents() {
  */
 function aDessiner() {
   const l = [];
+  if (!etat.visible) return l;
   const ici = new Set();
   if (etat.actif) {
     for (const v of presents()) {
