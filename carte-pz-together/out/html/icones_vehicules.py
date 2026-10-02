@@ -7,6 +7,16 @@ non plus, a part les schemas de l'ecran de mecanique. On refait donc ce que
 fait le jeu, en plus simple : le maillage du script du vehicule, sa texture,
 un eclairage, vu d'en haut (la pastille sur la carte) et de 3/4 (la fiche).
 
+LA VUE ISOMETRIQUE
+Sur la carte isometrique, le vehicule est vu comme dans le jeu : camera
+orthographique tournee de 45 degres, inclinee pour qu'une case fasse un
+losange deux fois plus large que haut (sin 30 = 1/2). Le relief ne se deduit
+pas d'une image a plat : chaque cap est un rendu a part, arrondi a 32
+directions ("iso00" a "iso31", l'avant vers l'est puis dans le sens des
+aiguilles d'une montre a l'ecran). L'echelle est fixe, ISO_A pixels par
+demi-largeur de losange, et le rendu note ou tombe le centre du vehicule au
+sol (l'ancre) : la carte n'a qu'a poser l'image a sa place et l'agrandir.
+
 LA PEINTURE
 Lue dans media/shaders/vehicle_multiuv.frag : l'alpha de la texture dit ou
 la carrosserie est peinte (alpha 1 : pas de peinture, chrome, vitres, pneus).
@@ -32,6 +42,7 @@ Le serveur de la carte l'appelle a la demande et garde le resultat dans
 vehicules-icones/ (non versionne).
 """
 
+import functools
 import glob
 import io
 import json
@@ -58,6 +69,10 @@ VERSION_RENDU = 3
 
 DESSUS = 96     # px pour la longueur du vehicule, vue de dessus
 TROIS_QUARTS = 180   # px de large, vue de 3/4
+ISO_A = 24      # px par case le long d'un axe, a l'horizontale (64 sur la carte au zoom max)
+ISO_CAPS = 32   # directions rendues en vue isometrique
+ISO_H = ISO_A * 2 * 0.8660254 / 2 ** 0.5   # px par case de hauteur : cos 30 x (A / cos 45)
+VUES = ('dessus', '34') + tuple('iso%02d' % i for i in range(ISO_CAPS))
 SURECH = 3      # sur-echantillonnage, pour lisser les bords
 
 
@@ -280,6 +295,7 @@ def trouver_fichier(sous, chemin, extensions):
 
 # --- maillage ----------------------------------------------------------------------
 
+@functools.lru_cache(maxsize=6)
 def lire_fichier_maillage(nom):
     """{sous-maillage: (positions, uv)} d'un fichier de modele.
 
@@ -374,8 +390,37 @@ def _rotation(lacet, tangage):
     return rx @ ry
 
 
-def rendre(pos, uv, numtex, textures, vue):
-    """Rasterise les triangles. Rend (couleur RGBA, peinture-eclairage RGBA).
+def projeter_iso(pos, unite, cap):
+    """Maillage -> (x ecran, y ecran, profondeur) en pixels de la vue iso, et le monde.
+
+    Repere du vehicule (voir rendre) : avant vers -z, droite vers -x, haut
+    vers +y. Repere du monde : x vers l'est, y vers le sud (vers le bas de la
+    carte), h vers le haut, en cases. Le centre du vehicule est mis au sol.
+    """
+    a = 2 * np.pi * cap / ISO_CAPS
+    fx, fy = np.cos(a), np.sin(a)          # avant, dans le monde
+    rx, ry = -fy, fx                       # droite : l'avant tourne d'un quart vers l'ecran-droite
+    v = pos.reshape(-1, 3)
+    cx = (v[:, 0].min() + v[:, 0].max()) / 2
+    cz = (v[:, 2].min() + v[:, 2].max()) / 2
+    av = -(pos[..., 2] - cz) * unite
+    dr = -(pos[..., 0] - cx) * unite
+    h = (pos[..., 1] - v[:, 1].min()) * unite
+    wx = fx * av + rx * dr
+    wy = fy * av + ry * dr
+    monde = np.stack([wx, wy, h], axis=-1)
+    p = np.stack([(wx - wy) * ISO_A,
+                  (wx + wy) * ISO_A / 2 - h * ISO_H,
+                  # plus pres de la camera (sud-est, en haut) = plus petit
+                  -((wx + wy) * 0.6123724 + h * 0.5)], axis=-1)
+    return p, monde
+
+
+def rendre(pos, uv, numtex, textures, vue, unite=1.0):
+    """Rasterise les triangles. Rend (image, ancre).
+
+    image : couleur RGBA en haut, peinture-eclairage RGBA en bas.
+    ancre : (x, y) en pixels du centre du vehicule au sol, en vue iso ; None sinon.
 
     Dans les maillages du jeu l'AVANT est vers -z : verifie sur le rendu de
     3/4, ou un lacet de -35 degres montrait la plaque et les feux arriere.
@@ -384,8 +429,16 @@ def rendre(pos, uv, numtex, textures, vue):
     rotation (pas un miroir) de la vue naturelle depuis +y : la carte n'a plus
     qu'a tourner l'image selon le cap du vehicule.
     vue '34' : avant-gauche, d'un peu haut.
+    vue 'isoNN' : camera de la carte isometrique, cap NN (voir projeter_iso),
+    a echelle fixe : unite convertit le maillage en cases.
     """
-    if vue == 'dessus':
+    monde = pos
+    if vue.startswith('iso'):
+        p, monde = projeter_iso(pos, unite, int(vue[3:]))
+        p = p * SURECH
+        echelle = 1.0
+        origine = np.array([0.0, 0.0])
+    elif vue == 'dessus':
         # ecran x = -x, ecran y = +z, profondeur = -y (plus haut = plus pres)
         p = np.stack([-pos[..., 0], pos[..., 2], -pos[..., 1]], axis=-1)
         cote = DESSUS * SURECH
@@ -397,6 +450,8 @@ def rendre(pos, uv, numtex, textures, vue):
         cote = TROIS_QUARTS * SURECH
         echelle = cote / max(1e-6, np.ptp(p[..., 0]))
     mini = p.reshape(-1, 3).min(axis=0)
+    if vue.startswith('iso'):
+        origine = (origine - mini[:2]) + SURECH * 2
     p = (p - mini) * echelle
     p[..., 0] += SURECH * 2
     p[..., 1] += SURECH * 2
@@ -404,9 +459,11 @@ def rendre(pos, uv, numtex, textures, vue):
     haut = int(np.ceil(p[..., 1].max())) + SURECH * 4
 
     # Normales des faces, dans le repere du monde, pour l'eclairage.
-    n = np.cross(pos[:, 1] - pos[:, 0], pos[:, 2] - pos[:, 0])
+    n = np.cross(monde[:, 1] - monde[:, 0], monde[:, 2] - monde[:, 0])
     n /= np.linalg.norm(n, axis=1, keepdims=True) + 1e-12
-    lumiere = np.array([0.35, 0.85, 0.4])
+    # En iso, la lumiere est fixe dans le monde (haut, un peu du nord-ouest) :
+    # elle ne tourne pas avec le vehicule.
+    lumiere = np.array([-0.3, -0.4, 0.85]) if vue.startswith('iso') else np.array([0.35, 0.85, 0.4])
     lumiere /= np.linalg.norm(lumiere)
     # Faces dans les deux sens : les maillages de jeu ne sont pas toujours
     # orientes de facon coherente.
@@ -469,7 +526,11 @@ def rendre(pos, uv, numtex, textures, vue):
     haut_ = np.concatenate([rgb, alpha], axis=-1)
     bas = np.concatenate([au[..., :1], np.clip(au[..., 1:2] / 1.2, 0, 1),
                           np.zeros_like(alpha), alpha], axis=-1)
-    return (np.clip(np.concatenate([haut_, bas], axis=0), 0, 1) * 255).astype(np.uint8)
+    img = (np.clip(np.concatenate([haut_, bas], axis=0), 0, 1) * 255).astype(np.uint8)
+    ancre = None
+    if vue.startswith('iso'):
+        ancre = (round(float(origine[0]) / SURECH, 2), round(float(origine[1]) / SURECH, 2))
+    return img, ancre
 
 
 # --- cache ---------------------------------------------------------------------------
@@ -485,7 +546,7 @@ def chemin_icone(script, peau, vue):
 
 def icone(script, peau=0, vue='dessus'):
     """Chemin du PNG en cache, rendu au besoin. None si le vehicule est inconnu."""
-    if not NOM_SUR.match(script) or vue not in ('dessus', '34'):
+    if not NOM_SUR.match(script) or vue not in VUES:
         return None
     chemin = chemin_icone(script, peau, vue)
     if os.path.isfile(chemin):
@@ -522,7 +583,7 @@ def icone(script, peau=0, vue='dessus'):
             uv = np.concatenate([m[0][1] for m in morceaux])
             numtex = np.concatenate([np.full(len(m[0][0]), noms_tex.index(m[1])) for m in morceaux])
             pos = orienter(pos, d['etendue'])
-            img = rendre(pos, uv, numtex, textures, vue)
+            img, ancre = rendre(pos, uv, numtex, textures, vue, d['echelle'])
         except Exception as e:
             # On note l'echec pour ne pas relancer assimp a chaque requete.
             with open(echec, 'w') as f:
@@ -531,7 +592,8 @@ def icone(script, peau=0, vue='dessus'):
         taille = np.ptp(pos.reshape(-1, 3), axis=0) * d['echelle']
         with open(chemin[:-4] + '.json', 'w') as f:
             json.dump({'longueur': round(float(taille[2]), 2), 'largeur': round(float(taille[0]), 2),
-                       'peaux': len(d['peaux'])}, f)
+                       'peaux': len(d['peaux']), 'ancre': ancre,
+                       'echelle': ISO_A if ancre else None}, f)
         tmp = chemin + '.tmp'
         Image.fromarray(img, 'RGBA').save(tmp, 'PNG', optimize=True)
         os.replace(tmp, chemin)

@@ -9,17 +9,20 @@
 //    vehicles.db, la base de la sauvegarde, n'est pas utilisee : le jeu ne la
 //    tient pas a jour, ses positions etaient fausses.
 //  - GET /api/vehicules/icone : le modele 3D du vehicule rendu vu de dessus
-//    (la pastille) ou de 3/4 (la fiche), voir out/html/icones_vehicules.py.
+//    (la pastille), de 3/4 (la fiche) ou en isometrique selon son cap (la
+//    pastille en vue iso), voir out/html/icones_vehicules.py.
 //
 // A L'ECRAN
 // Le vehicule vu de dessus, a sa taille reelle, tourne selon son cap et peint
-// de sa couleur dans le jeu. Net : il est la maintenant. Pali : vu par
+// de sa couleur dans le jeu. En vue isometrique, il est vu comme dans le jeu,
+// en relief : une image rendue par cap (32 directions), posee sur sa case. Net : il est la maintenant. Pali : vu par
 // l'agent, plus dans la zone chargee depuis. Un carre de sa couleur tant que
 // l'icone n'est pas arrivee, ou si son modele n'a pas pu etre rendu. Un clic
 // ouvre sa fiche.
 
 import { vue, mondeVersEcranX, mondeVersEcranY, empriseMondeVisible,
          echelle } from './vue.js';
+import { mode } from './geometrie.js';
 import * as joueur from './joueur.js';
 
 const PERIODE = 1000;           // ms, comme l'agent
@@ -304,6 +307,8 @@ function brut(s, peau, vueIcone) {
           l: c.width, h: c.height / 2,
           longueur: parseFloat(r.headers.get('X-Longueur')) || 4.5,
           largeur: parseFloat(r.headers.get('X-Largeur')) || 2,
+          ancre: (r.headers.get('X-Ancre') || '').split(',').map(parseFloat),
+          echelle: parseFloat(r.headers.get('X-Echelle')) || 0,
         };
       } catch (e) {
         return null;
@@ -366,7 +371,8 @@ function iconePeinte(v, vueIcone) {
     const cv = document.createElement('canvas');
     cv.width = b.l; cv.height = b.h;
     cv.getContext('2d').putImageData(sortie, 0, 0);
-    peints.set(cle, { url: cv.toDataURL(), longueur: b.longueur, largeur: b.largeur });
+    peints.set(cle, { url: cv.toDataURL(), longueur: b.longueur, largeur: b.largeur,
+                      l: b.l, h: b.h, ancre: b.ancre, echelle: b.echelle });
     rendre();
     majFiche();
   });
@@ -376,6 +382,44 @@ function iconePeinte(v, vueIcone) {
 // --- dessin -------------------------------------------------------------------
 
 const LONGUEUR_MIN = 18;   // px : en dessous, une voiture n'est plus lisible
+const CAPS_ISO = 32;       // directions rendues par le serveur (icones_vehicules.ISO_CAPS)
+const iconesIso = new Map();   // cle du vehicule -> derniere image iso affichee
+
+/**
+ * La vue iso a rendre pour ce cap : "iso00" (avant vers l'est) a "iso31",
+ * dans le sens du cap du monde (y vers le sud). Sans cap connu : vers le nord.
+ */
+function vueIso(cap) {
+  const a = (cap && (cap[0] || cap[1])) ? Math.atan2(cap[1], cap[0]) : -Math.PI / 2;
+  const i = ((Math.round(a / (2 * Math.PI / CAPS_ISO)) % CAPS_ISO) + CAPS_ISO) % CAPS_ISO;
+  return 'iso' + String(i).padStart(2, '0');
+}
+
+/**
+ * Pose l'image iso : son ancre (le centre du vehicule au sol) sur la case,
+ * agrandie de l'echelle du rendu (px par case le long d'un axe) a celle de
+ * la carte. Rend false si aucune image iso n'est encore prete.
+ */
+function poserIso(el, d, sx, sy) {
+  let ic = iconePeinte(d.v, vueIso(d.v && d.v.cap));
+  // Le cap vient de changer et l'image du nouvel angle arrive : on garde
+  // l'ancienne en attendant, plutot que de clignoter en carre.
+  if (ic) iconesIso.set(d.cle, ic);
+  else if (ic === undefined) ic = iconesIso.get(d.cle);
+  if (!ic || !ic.echelle || !(ic.ancre.length === 2)) return false;
+  const pxAxe = Math.abs(mondeVersEcranX(1, 0) - mondeVersEcranX(0, 0));
+  const k = Math.max(pxAxe / ic.echelle, LONGUEUR_MIN * 1.5 / ic.l);
+  el.style.width = Math.round(ic.l * k) + 'px';
+  el.style.height = Math.round(ic.h * k) + 'px';
+  el.style.left = Math.round(sx - ic.ancre[0] * k) + 'px';
+  el.style.top = Math.round(sy - ic.ancre[1] * k) + 'px';
+  el.style.backgroundImage = `url(${ic.url})`;
+  el.style.transform = 'none';
+  // Le plus au sud-est passe devant, comme dans le jeu.
+  el.style.zIndex = String(Math.round(d.x + d.y) + (etat.selection === d.cle ? 100000 : 0));
+  el.style.removeProperty('--teinte');
+  return true;
+}
 
 export function dessinerVehicules() {
   if (!conteneur) return;
@@ -399,8 +443,16 @@ export function dessinerVehicules() {
       conteneur.appendChild(el);
     }
     const sx = mondeVersEcranX(d.x, d.y), sy = mondeVersEcranY(d.x, d.y);
-    const ic = iconePeinte(d.v, 'dessus');
     el.dataset.cle = d.cle;
+    if (mode === 'iso') {
+      if (poserIso(el, d, sx, sy)) {
+        el.className = 'vh iso ' + d.sorte + ' icone' + (etat.selection === d.cle ? ' selection' : '');
+        el.title = (d.v && (d.v.n || d.v.s)) || 'vehicule';
+        continue;
+      }
+    }
+    el.style.zIndex = '';
+    const ic = iconePeinte(d.v, 'dessus');
     el.className = 'vh ' + d.sorte + (ic ? ' icone' : '') + (etat.selection === d.cle ? ' selection' : '');
     el.style.left = Math.round(sx) + 'px';
     el.style.top = Math.round(sy) + 'px';
@@ -431,7 +483,7 @@ export function dessinerVehicules() {
     }
   }
   for (const [cle, el] of elements) {
-    if (!gardes.has(cle)) { el.remove(); elements.delete(cle); }
+    if (!gardes.has(cle)) { el.remove(); elements.delete(cle); iconesIso.delete(cle); }
   }
   if (bulle && bulle.classList.contains('visible')) placerFiche();
 }

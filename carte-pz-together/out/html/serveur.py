@@ -15,7 +15,7 @@ La carte est statique a deux exceptions pres :
     GET /api/vehicules?connus=1 tous ceux qu'il a deja vus, tires de son
     journal. Lecture seule, voir vehicules.py.
   - GET /api/vehicules/icone?s=Base.CarNormal&p=0&v=dessus renvoie l'icone
-    rendue du modele 3D (v = dessus ou 34), en cache dans vehicules-icones/.
+    rendue du modele 3D (v = dessus, 34, ou iso00 a iso31 : vue iso par cap), en cache dans vehicules-icones/.
     Voir icones_vehicules.py.
   - GET /pulse.html sert la page du mod PZ Pulse, lue la ou le mod est
     installe sur ce PC, et /api/pulse/data.txt, heartbeat.txt et lang.txt
@@ -357,6 +357,9 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('X-Longueur', str(info.get('longueur', '')))
             self.send_header('X-Largeur', str(info.get('largeur', '')))
             self.send_header('X-Peaux', str(info.get('peaux', '')))
+            if info.get('ancre'):
+                self.send_header('X-Ancre', '%s,%s' % tuple(info['ancre']))
+                self.send_header('X-Echelle', str(info.get('echelle', '')))
             self.end_headers()
             self.wfile.write(corps)
             return
