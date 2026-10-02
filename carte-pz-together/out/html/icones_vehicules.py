@@ -65,7 +65,7 @@ ICI = os.path.dirname(os.path.realpath(__file__))
 CACHE = os.path.join(ICI, 'vehicules-icones')
 # Le contenu du rendu change si ce code change : le numero entre dans le nom
 # des fichiers en cache.
-VERSION_RENDU = 4
+VERSION_RENDU = 3
 
 DESSUS = 96     # px pour la longueur du vehicule, vue de dessus
 TROIS_QUARTS = 180   # px de large, vue de 3/4
@@ -227,9 +227,6 @@ def decrire(script):
         return None
     fichier = peaux = etendue = None
     echelle = 1.0
-    decalage = (0.0, 0.0, 0.0)
-    centre_masse = None
-    roues = {}
     pieces, vues = [], set()
     for b in _chaine_gabarits(bloc, ix):
         # Les pieces (portieres, capot, coffre...) que certains mods modelisent
@@ -249,19 +246,8 @@ def decrire(script):
             if enfant[0] == 'model' and 'file' in enfant[1] and fichier is None:
                 fichier = enfant[1]['file'][-1]
                 echelle = _nombre(enfant[1].get('scale'), 1.0)
-                decalage = _vecteur(enfant[1].get('offset')) or decalage
-            # Les roues : position (unites du script), rayon, largeur. Le
-            # vehicule d'abord, puis ses gabarits : la premiere definition gagne.
-            e = enfant[0].split()
-            if len(e) == 2 and e[0] == 'wheel' and e[1] not in roues:
-                centre = _vecteur(enfant[1].get('offset'))
-                if centre:
-                    roues[e[1]] = (centre, _nombre(enfant[1].get('radius'), 0.15),
-                                   _nombre(enfant[1].get('width'), 0.2))
             if enfant[0] == 'skin' and 'texture' in enfant[1] and peaux is None:
                 peaux = [s[1]['texture'][-1] for s in b[2] if s[0] == 'skin' and 'texture' in s[1]]
-        if centre_masse is None and 'centerOfMassOffset' in b[1]:
-            centre_masse = _vecteur(b[1]['centerOfMassOffset'])
         if etendue is None and 'extents' in b[1]:
             etendue = [float(x) for x in b[1]['extents'][-1].split()]
     if not fichier:
@@ -285,27 +271,16 @@ def decrire(script):
     # Taille reelle : unites du maillage x echelle du modele x echelle du
     # vehicule. Donne des metres, soit des cases : 4,8 x 1,9 pour la
     # Chevalier Nyala, 4,5 x 2,4 pour le HMMWV.
-    echelle_script = echelle
     echelle *= _nombre(modele[1].get('scale'), 1.0)
     return {'script': script, 'maillage': maillage, 'peaux': peaux or [],
-            'roues': list(roues.values()), 'echelle_script': echelle_script, 'decalage': decalage,
-            'centre_masse': centre_masse or (0.0, 0.0, 0.0),
             'etendue': etendue, 'pieces': autres, 'echelle': echelle}
 
 
 def _nombre(valeurs, defaut):
     try:
-        return float(valeurs[-1].rstrip('fF'))
+        return float(valeurs[-1])
     except (TypeError, ValueError, IndexError):
         return defaut
-
-
-def _vecteur(valeurs):
-    try:
-        v = [float(x.rstrip('f')) for x in valeurs[-1].split()]
-    except (TypeError, ValueError, IndexError, AttributeError):
-        return None
-    return tuple(v) if len(v) == 3 else None
 
 
 def trouver_fichier(sous, chemin, extensions):
@@ -383,69 +358,6 @@ def choisir(groupes, sous, nom):
         raise ValueError('sous-maillage %s absent de %s' % (sous, nom))
     return (np.concatenate([groupes[g][0] for g in choisis]),
             np.concatenate([groupes[g][1] for g in choisis]))
-
-
-# Texture des roues, faite ici : pneu sombre, jante grise. Alpha 1 partout :
-# rien n'est peint de la couleur du vehicule.
-TEXTURE_ROUE = Image.new('RGBA', (2, 1))
-TEXTURE_ROUE.putdata([(38, 38, 40, 255), (150, 150, 155, 255)])
-COTES_ROUE = 14
-JANTE = 0.6     # rayon de la jante, en part du rayon de la roue
-
-
-def roue(centre, rayon, largeur):
-    """Triangles (positions, uv) d'une roue : un cylindre d'axe x, ses deux flancs.
-
-    Les roues du jeu sont des maillages a part (media/models/Vehicles_Wheel,
-    au format texte du jeu) poses par le moteur physique : un cylindre aux
-    mesures du script suffit a l'echelle de la carte.
-    """
-    a = np.linspace(0, 2 * np.pi, COTES_ROUE + 1)
-    y, z = np.cos(a) * rayon, np.sin(a) * rayon
-    h = largeur / 2
-    tri, uv = [], []
-    pneu, jante = (0.25, 0.5), (0.75, 0.5)
-    for i in range(COTES_ROUE):
-        g0, g1 = (-h, y[i], z[i]), (-h, y[i + 1], z[i + 1])
-        d0, d1 = (h, y[i], z[i]), (h, y[i + 1], z[i + 1])
-        tri += [(g0, g1, d1), (g0, d1, d0)]
-        uv += [(pneu,) * 3] * 2
-        # Flancs : la jante au centre, le pneu autour.
-        j0, j1 = (y[i] * JANTE, z[i] * JANTE), (y[i + 1] * JANTE, z[i + 1] * JANTE)
-        for x in (-h, h):
-            tri.append(((x, 0, 0), (x, *j0), (x, *j1)))
-            uv.append((jante,) * 3)
-            tri += [((x, *j0), (x, y[i], z[i]), (x, y[i + 1], z[i + 1])),
-                    ((x, *j0), (x, y[i + 1], z[i + 1]), (x, *j1))]
-            uv += [(pneu,) * 3] * 2
-    return np.array(tri) + np.array(centre), np.array(uv, dtype=np.float64)
-
-
-def ajouter_roues(pos, uv, numtex, d, num_texture):
-    """Ajoute les roues du script au maillage deja oriente (x largeur, y haut, z longueur).
-
-    Le script place tout dans son repere : la carrosserie a son "offset" du
-    bloc model, les roues a leur "offset". Une unite du script vaut
-    echelle_script cases, une unite du maillage echelle cases ; l'avant du
-    script est vers +z, celui du maillage vers -z. Les roues sont placees
-    par rapport au centre de masse ("centerOfMassOffset") : c'est l'origine
-    du chassis physique, qui les porte.
-    """
-    if not d['roues'] or not d['echelle'] or not d['echelle_script']:
-        return pos, uv, numtex
-    k = d['echelle_script'] / d['echelle']       # unites du maillage par unite du script
-    mx, my, mz = np.subtract(d['decalage'], d['centre_masse'])
-    morceaux_p, morceaux_t = [pos], [uv]
-    for (ox, oy, oz), rayon, largeur in d['roues']:
-        # Des mods donnent une largeur absurde (2 pour une semi-remorque,
-        # rayon 0,4) : le moteur physique s'en moque, pas le dessin.
-        largeur = min(largeur, 1.2 * rayon)
-        p, t = roue(((ox - mx) * k, (oy - my) * k, -(oz - mz) * k), rayon * k, largeur * k)
-        morceaux_p.append(p)
-        morceaux_t.append(t)
-    n = sum(len(p) for p in morceaux_p[1:])
-    return (np.concatenate(morceaux_p), np.concatenate(morceaux_t),
-            np.concatenate([numtex, np.full(n, num_texture)]))
 
 
 def orienter(pos, etendue):
@@ -671,8 +583,6 @@ def icone(script, peau=0, vue='dessus'):
             uv = np.concatenate([m[0][1] for m in morceaux])
             numtex = np.concatenate([np.full(len(m[0][0]), noms_tex.index(m[1])) for m in morceaux])
             pos = orienter(pos, d['etendue'])
-            textures.append(TEXTURE_ROUE)
-            pos, uv, numtex = ajouter_roues(pos, uv, numtex, d, len(textures) - 1)
             img, ancre = rendre(pos, uv, numtex, textures, vue, d['echelle'])
         except Exception as e:
             # On note l'echec pour ne pas relancer assimp a chaque requete.
