@@ -985,21 +985,23 @@ function dessinerVillesEvitees() {
 }
 
 // Routes dessinees, une fois validees : dessinees comme les routes du jeu,
-// chaussee grise bordee de clair, mais plus etroites (LARGEUR_ROUTE cases).
-const LARGEUR_ROUTE = 3;
+// chaussee grise bordee de clair, mais nettement plus etroites : un trait fin
+// d'une case et demie, plafonne a LARGEUR_MAX px quand on zoome.
+const LARGEUR_ROUTE = 1.5;
+const LARGEUR_MAX = 5;
 const TAILLE_NOM = 12;      // px, taille du nom quand il a la place
 const TAILLE_NOM_MIN = 6;   // px ; plus petit, illisible : pas de nom
 
 function largeurRoutePx() {
   const c = Math.abs(mondeVersEcranX(1, 0) - mondeVersEcranX(0, 0));
-  return Math.max(2.5, Math.min(16, LARGEUR_ROUTE * c));
+  return Math.max(1.5, Math.min(LARGEUR_MAX, LARGEUR_ROUTE * c));
 }
 
 function dessinerRoutesPerso() {
   const w = largeurRoutePx();
   for (const r of etat.routes) {
     const chemin = ligne(r.points);
-    ctx.lineWidth = w + 2;
+    ctx.lineWidth = w + 1.5;
     ctx.strokeStyle = 'rgba(232,232,228,0.9)';
     ctx.stroke(chemin);
     ctx.lineWidth = w;
