@@ -984,13 +984,39 @@ function dessinerVillesEvitees() {
   ctx.fill();
 }
 
-/** Nom de chaque route dessinee, pose sur son plus long troncon a l'ecran. */
+// Routes dessinees, une fois validees : dessinees comme les routes du jeu,
+// chaussee grise bordee de clair, mais plus etroites (LARGEUR_ROUTE cases).
+const LARGEUR_ROUTE = 3;
+const TAILLE_NOM = 12;      // px, taille du nom quand il a la place
+const TAILLE_NOM_MIN = 6;   // px ; plus petit, illisible : pas de nom
+
+function largeurRoutePx() {
+  const c = Math.abs(mondeVersEcranX(1, 0) - mondeVersEcranX(0, 0));
+  return Math.max(2.5, Math.min(16, LARGEUR_ROUTE * c));
+}
+
+function dessinerRoutesPerso() {
+  const w = largeurRoutePx();
+  for (const r of etat.routes) {
+    const chemin = ligne(r.points);
+    ctx.lineWidth = w + 2;
+    ctx.strokeStyle = 'rgba(232,232,228,0.9)';
+    ctx.stroke(chemin);
+    ctx.lineWidth = w;
+    ctx.strokeStyle = '#74777d';
+    ctx.stroke(chemin);
+  }
+}
+
+/**
+ * Nom de chaque route, couche sur son plus long troncon a l'ecran et centre
+ * dessus. S'il est plus long que le troncon, le texte retrecit pour y tenir ;
+ * en dessous de TAILLE_NOM_MIN il n'est plus lisible et n'est pas ecrit.
+ */
 function dessinerNomsRoutes() {
-  ctx.font = '600 12px system-ui, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
-  const poses = [];   // etiquettes a plat deja posees, pour ne pas les empiler
   for (const r of etat.routes) {
     let m = null, lMax = 0;
     for (let i = 1; i < r.points.length; i++) {
@@ -1000,29 +1026,25 @@ function dessinerNomsRoutes() {
       const L = Math.hypot(bx - ax, by - ay);
       if (L > lMax) { lMax = L; m = { ax, ay, bx, by }; }
     }
-    if (!m) continue;
+    if (!m || !r.nom) continue;
     const cx = (m.ax + m.bx) / 2, cy = (m.ay + m.by) / 2;
-    if (cx < -200 || cy < -50 || cx > vue.largeur + 200 || cy > vue.hauteur + 50) continue;
-    // Trop court a l'ecran pour porter le nom couche dessus : il s'ecrit a
-    // plat, au-dessus du milieu, pour rester lisible quand on dezoome.
-    const largeur = ctx.measureText(r.nom).width;
-    const couche = lMax >= largeur + 16;
-    if (!couche) {
-      if (poses.some(p => Math.abs(p.x - cx) < (p.l + largeur) / 2 + 6 && Math.abs(p.y - cy) < 16)) continue;
-      poses.push({ x: cx, y: cy, l: largeur });
-    }
-    let angle = couche ? Math.atan2(m.by - m.ay, m.bx - m.ax) : 0;
+    if (cx < -lMax || cy < -lMax || cx > vue.largeur + lMax || cy > vue.hauteur + lMax) continue;
+    ctx.font = '600 ' + TAILLE_NOM + 'px system-ui, sans-serif';
+    const place = lMax - 8;
+    const taille = Math.min(TAILLE_NOM, TAILLE_NOM * place / ctx.measureText(r.nom).width);
+    if (taille < TAILLE_NOM_MIN) continue;
+    ctx.font = '600 ' + taille.toFixed(1) + 'px system-ui, sans-serif';
+    let angle = Math.atan2(m.by - m.ay, m.bx - m.ax);
     if (angle > Math.PI / 2) angle -= Math.PI;
     if (angle < -Math.PI / 2) angle += Math.PI;
     ctx.save();
     ctx.translate(cx, cy);
     ctx.rotate(angle);
-    const dy = couche ? 0 : -12;
-    ctx.lineWidth = 3.5;
-    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-    ctx.strokeText(r.nom, 0, dy);
-    ctx.fillStyle = '#f2f3f5';
-    ctx.fillText(r.nom, 0, dy);
+    ctx.lineWidth = Math.max(2, taille / 4);
+    ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+    ctx.strokeText(r.nom, 0, 0.5);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(r.nom, 0, 0.5);
     ctx.restore();
   }
 }
@@ -1045,9 +1067,9 @@ export function dessinerItineraire() {
 
   dessinerVillesEvitees();
 
-  // Routes dessinees : toujours visibles. Grises une fois validees, le vert
-  // reste au brouillon en cours.
-  for (const r of etat.routes) trait(ligne(r.points), '#a9adb5', e * 0.7, false);
+  // Routes dessinees : toujours visibles. Grises une fois validees, comme
+  // les routes du jeu ; le vert reste au brouillon en cours.
+  dessinerRoutesPerso();
   dessinerNomsRoutes();
   if (etat.brouillon.length) {
     trait(ligne(etat.brouillon), '#d6ff5a', e * 0.8, true);

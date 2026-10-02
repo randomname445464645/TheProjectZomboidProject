@@ -151,7 +151,8 @@ emprunter.
 
 A l'enregistrement, une route dessinee est redressee sur les axes de la grille
 du jeu (carte/redressage.js), alignee sur les autres routes dessinees, puis
-affichee en gris avec son nom. Le bouton "original" de la liste remet le trace
+dessinee comme les routes du jeu, en gris borde de clair mais plus etroite,
+avec son nom couche dessus et retreci s'il depasse. Le bouton "original" de la liste remet le trace
 clique, garde dans la route ; les routes d'avant le redressage sont aussi
 copiees une fois dans `pzcarte.routesPerso.avantRedressage` (localStorage).
 
