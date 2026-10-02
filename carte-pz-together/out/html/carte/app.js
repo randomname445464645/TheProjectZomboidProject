@@ -1303,6 +1303,14 @@ function majVillesEtRoutes() {
       cadrerSur(x0, y0, x1, y1, 60);
       demanderRendu(true);
     }));
+    if (route.brut) {
+      const b = bouton(route.redresse === false ? 'redresser' : 'original',
+        () => trajet.basculerRedressage(i));
+      b.title = route.redresse === false
+        ? 'Redresser sur les axes de la grille'
+        : 'Revenir au trace clique d\'origine';
+      el.appendChild(b);
+    }
     el.appendChild(bouton('x', () => {
       if (confirm('Supprimer la route "' + route.nom + '" ?')) trajet.supprimerRoute(i);
     }));

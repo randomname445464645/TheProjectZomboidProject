@@ -24,9 +24,13 @@
 // ROUTES DESSINEES
 // On clique les points d'une route que la carte ne connait pas (un chemin
 // dans les bois, une breche dans une cloture). Une fois enregistree, elle
-// entre dans le reseau et le GPS peut l'emprunter.
+// entre dans le reseau et le GPS peut l'emprunter. Elle est redressee sur
+// les axes de la grille (redressage.js), le trace clique reste dans
+// route.brut, et elle passe en gris : verte tant qu'on la dessine, grise une
+// fois validee. Son nom s'affiche le long du trace.
 
 import { vue, echelle, mondeVersEcranX, mondeVersEcranY } from './vue.js';
+import { redresserRoutes } from './redressage.js';
 
 const BITUME = 1, GRAVIER = 2, TERRE = 3, PERSO = 4;
 // Cout par case parcourue selon la chaussee. Le bitume sert de reference.
@@ -68,7 +72,9 @@ export const etat = {
   calculEnCours: false,
   // Evitement : noms des villes evitees.
   evitees: [],
-  // Routes dessinees a la main : [{nom, points:[{x,y}]}]
+  // Routes dessinees a la main : [{nom, points:[{x,y}], brut, redresse}]
+  // brut : trace clique d'origine. redresse : false si l'utilisateur l'a
+  // remise a l'original, true sinon.
   routes: [],
   brouillon: [],            // points de la route en cours de dessin
   zones: [],                // [{nom, blocs}] groupees par nom, une fois charge
@@ -99,6 +105,9 @@ let rappelExterne = () => {};
 // villes evitees et les routes dessinees. Le trace se recalcule.
 const CLE = 'pzcarte.trajet';
 const CLE_ROUTES = 'pzcarte.routesPerso';
+// Copie des routes telles qu'elles etaient avant le premier redressage, ecrite
+// une seule fois. Chaque route garde aussi son trace d'origine dans brut.
+const CLE_SAUVEGARDE = 'pzcarte.routesPerso.avantRedressage';
 
 function enregistrer() {
   try {
@@ -138,7 +147,18 @@ export function initItineraire(element, rappel) {
       etat.routes = r.map((x, i) => ({
         nom: typeof x.nom === 'string' ? x.nom : 'route ' + (i + 1),
         points: pointsValides(x.points),
+        brut: pointsValides(x.brut),
+        redresse: typeof x.redresse === 'boolean' ? x.redresse : undefined,
       })).filter(x => x.points.length > 1);
+      for (const x of etat.routes) if (x.brut.length < 2) delete x.brut;
+    }
+    // Routes d'avant le redressage : sauvegarde, puis redressage une fois.
+    if (etat.routes.some(x => x.redresse === undefined)) {
+      if (!localStorage.getItem(CLE_SAUVEGARDE)) {
+        localStorage.setItem(CLE_SAUVEGARDE, localStorage.getItem(CLE_ROUTES) || '[]');
+      }
+      redresserTout();
+      enregistrer();
     }
   } catch (e) { /* valeur illisible : on repart de zero */ }
   // Le reseau est charge tout de suite : la liste des villes en depend, et
@@ -742,17 +762,45 @@ export function abandonnerBrouillon() {
   auChangement();
 }
 
+/**
+ * Redresse ensemble toutes les routes, sauf celles remises a l'original : les
+ * bouts d'une meme chaussee dessines separement s'alignent entre eux.
+ * Repart toujours du trace d'origine, donc refaire ne deforme rien.
+ */
+function redresserTout() {
+  const idx = [], liste = [];
+  etat.routes.forEach((r, i) => { if (r.redresse !== false) { idx.push(i); liste.push(r); } });
+  redresserRoutes(liste).forEach((r, k) => { etat.routes[idx[k]] = r; });
+}
+
 /** Enregistre le brouillon comme route ; le GPS peut l'emprunter aussitot. */
 export function enregistrerBrouillon(nom) {
   if (etat.brouillon.length < 2) return false;
   etat.routes.push({
     nom: (nom || '').trim() || 'route ' + (etat.routes.length + 1),
     points: etat.brouillon.slice(),
+    brut: etat.brouillon.slice(),
   });
   etat.brouillon = [];
+  redresserTout();
   if (reseau) integrerRoutesPerso();
   recalculer();
   return true;
+}
+
+/** Passe une route du trace redresse au trace clique d'origine, et retour. */
+export function basculerRedressage(i) {
+  const r = etat.routes[i];
+  if (!r) return;
+  if (r.redresse === false) {
+    r.redresse = true;
+  } else {
+    r.redresse = false;
+    r.points = (r.brut || r.points).slice();
+  }
+  redresserTout();
+  if (reseau) integrerRoutesPerso();
+  recalculer();
 }
 
 export function supprimerRoute(i) {
@@ -936,6 +984,49 @@ function dessinerVillesEvitees() {
   ctx.fill();
 }
 
+/** Nom de chaque route dessinee, pose sur son plus long troncon a l'ecran. */
+function dessinerNomsRoutes() {
+  ctx.font = '600 12px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  const poses = [];   // etiquettes a plat deja posees, pour ne pas les empiler
+  for (const r of etat.routes) {
+    let m = null, lMax = 0;
+    for (let i = 1; i < r.points.length; i++) {
+      const pa = r.points[i - 1], pb = r.points[i];
+      const ax = mondeVersEcranX(pa.x, pa.y), ay = mondeVersEcranY(pa.x, pa.y);
+      const bx = mondeVersEcranX(pb.x, pb.y), by = mondeVersEcranY(pb.x, pb.y);
+      const L = Math.hypot(bx - ax, by - ay);
+      if (L > lMax) { lMax = L; m = { ax, ay, bx, by }; }
+    }
+    if (!m) continue;
+    const cx = (m.ax + m.bx) / 2, cy = (m.ay + m.by) / 2;
+    if (cx < -200 || cy < -50 || cx > vue.largeur + 200 || cy > vue.hauteur + 50) continue;
+    // Trop court a l'ecran pour porter le nom couche dessus : il s'ecrit a
+    // plat, au-dessus du milieu, pour rester lisible quand on dezoome.
+    const largeur = ctx.measureText(r.nom).width;
+    const couche = lMax >= largeur + 16;
+    if (!couche) {
+      if (poses.some(p => Math.abs(p.x - cx) < (p.l + largeur) / 2 + 6 && Math.abs(p.y - cy) < 16)) continue;
+      poses.push({ x: cx, y: cy, l: largeur });
+    }
+    let angle = couche ? Math.atan2(m.by - m.ay, m.bx - m.ax) : 0;
+    if (angle > Math.PI / 2) angle -= Math.PI;
+    if (angle < -Math.PI / 2) angle += Math.PI;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(angle);
+    const dy = couche ? 0 : -12;
+    ctx.lineWidth = 3.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.strokeText(r.nom, 0, dy);
+    ctx.fillStyle = '#f2f3f5';
+    ctx.fillText(r.nom, 0, dy);
+    ctx.restore();
+  }
+}
+
 export function dessinerItineraire() {
   if (!canvas) return;
   const dpr = window.devicePixelRatio || 1;
@@ -954,8 +1045,10 @@ export function dessinerItineraire() {
 
   dessinerVillesEvitees();
 
-  // Routes dessinees : toujours visibles, vert pale.
-  for (const r of etat.routes) trait(ligne(r.points), '#9be37a', e * 0.7, false);
+  // Routes dessinees : toujours visibles. Grises une fois validees, le vert
+  // reste au brouillon en cours.
+  for (const r of etat.routes) trait(ligne(r.points), '#a9adb5', e * 0.7, false);
+  dessinerNomsRoutes();
   if (etat.brouillon.length) {
     trait(ligne(etat.brouillon), '#d6ff5a', e * 0.8, true);
     for (const p of etat.brouillon) {

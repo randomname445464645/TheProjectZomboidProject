@@ -149,6 +149,12 @@ fois plus long. Les routes dessinees a la main (bouton "dessiner une route")
 sont gardees dans le navigateur et entrent dans le reseau : le GPS peut les
 emprunter.
 
+A l'enregistrement, une route dessinee est redressee sur les axes de la grille
+du jeu (carte/redressage.js), alignee sur les autres routes dessinees, puis
+affichee en gris avec son nom. Le bouton "original" de la liste remet le trace
+clique, garde dans la route ; les routes d'avant le redressage sont aussi
+copiees une fois dans `pzcarte.routesPerso.avantRedressage` (localStorage).
+
 A refaire apres un changement de carte ou de mods (environ 80 s, 4 processus
 d'environ 40 Mo) :
 

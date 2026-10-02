@@ -10,7 +10,7 @@
 // s'ouvrir instantanement et de fonctionner meme si le serveur local n'a pas
 // encore demarre.
 
-const VERSION = 'carte-pz-v10';  // v10 : fiche PZ Pulse
+const VERSION = 'carte-pz-v11';  // v11 : routes dessinees redressees
 
 // Chemins de la coquille. Les parametres ?v= des balises sont conserves tels
 // quels : c'est l'URL complete qui sert de cle de cache.
@@ -32,6 +32,7 @@ const COQUILLE = [
   '/carte/constructions.js',
   '/carte/bases.js',
   '/carte/itineraire.js',
+  '/carte/redressage.js',
   '/carte/joueur.js',
   '/carte/historique.js',
   '/carte/loot-pieces.json',
